@@ -3,7 +3,7 @@ import React from "react";
 import Card from "../components/shared/Card";
 import KPI from "../components/shared/KPI";
 import ChartWrapper from "../components/shared/ChartWrapper";
-import Table from "../components/shared/Table";
+import DataTable from "../components/shared/DataTable";
 import Sidebar from "../components/shared/Sidebar";
 import Topbar from "../components/shared/Topbar";
 import AlertBox from "../components/shared/AlertBox";
@@ -12,12 +12,24 @@ import AlertBox from "../components/shared/AlertBox";
 import { FiDollarSign, FiCreditCard, FiUsers } from "react-icons/fi";
 
 const TestComponents = () => {
+  const columns = [
+    { key: "date", label: "Date", sortable: true },
+    { key: "employee", label: "Employee", sortable: true },
+    { key: "payment", label: "Payment", sortable: true },
+  ];
+
+  const data = [
+    { date: "05/30/2024", employee: "Alice", payment: "$260" },
+    { date: "05/29/2024", employee: "Bob", payment: "$540" },
+    { date: "05/28/2024", employee: "Charlie", payment: "$310" },
+  ];
+
   return (
     <div className="flex">
       {/* Sidebar for employer */}
       <Sidebar role="employer" />
 
-      <div className="flex-1 bg-gray-50 min-h-screen">
+      <div className="flex-1 bg-gray-50 dark:bg-gray-900 min-h-screen">
         {/* Top bar */}
         <Topbar user={{ name: "John Doe" }} role="Employer" />
 
@@ -48,16 +60,10 @@ const TestComponents = () => {
             />
           </Card>
 
-          {/* Table */}
+          {/* DataTable instead of old Table */}
           <Card className="col-span-3">
-            <Table
-              title="Recent Transactions"
-              columns={["Date", "Employee", "Payment"]}
-              data={[
-                ["05/30/2024", "Alice", "$260"],
-                ["05/29/2024", "Bob", "$540"],
-              ]}
-            />
+            <h2 className="text-lg font-semibold mb-3">Recent Transactions</h2>
+            <DataTable columns={columns} data={data} loading={false} />
           </Card>
         </div>
       </div>

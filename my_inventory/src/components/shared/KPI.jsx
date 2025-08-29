@@ -1,18 +1,16 @@
 // src/components/shared/KPI.jsx
 import React from "react";
 
-const KPI = ({ icon: Icon, label, value }) => {
+export default function KPI({ icon: Icon, label, value }) {
   return (
-    <div className="flex items-center space-x-3 p-4 bg-white rounded shadow">
-      {/* ✅ Render icon as component */}
-      {Icon && <Icon className="text-blue-600 text-xl" />}
-
+    <div className="flex items-center gap-3">
+      <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+        {Icon && <Icon size={20} />}
+      </div>
       <div>
-        <p className="text-sm text-gray-500">{label}</p>
-        <h3 className="text-lg font-semibold">{value}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="text-xl font-semibold dark:text-white">{value}</p>
       </div>
     </div>
   );
-};
-
-export default KPI;
+}

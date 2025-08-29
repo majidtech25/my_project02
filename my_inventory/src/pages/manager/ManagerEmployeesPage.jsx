@@ -1,287 +1,211 @@
-import React, { useMemo, useState } from "react";
+// src/pages/manager/ManagerEmployeesPage.jsx
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  getEmployees,
+  createEmployee,
+  updateEmployee,
+} from "../../services/api";
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import Button from "../../components/shared/Button";
+import DataTable from "../../components/shared/DataTable";
+import ModalCard from "../../components/shared/ModalCard";
+import { toast } from "react-toastify";
+import { FiUsers, FiUserCheck, FiUserX } from "react-icons/fi";
 
-const initialRows = [
-  {
-    id: "EMP-001",
-    name: "Alice Kamau",
-    role: "employee",
-    username: "alice",
-    phone: "0712 000 111",
-    status: "Active",
-  },
-  {
-    id: "EMP-002",
-    name: "Bob Otieno",
-    role: "employee",
-    username: "bob",
-    phone: "0722 111 222",
-    status: "Active",
-  },
-  {
-    id: "EMP-003",
-    name: "Carol Njeri",
-    role: "employee",
-    username: "carol",
-    phone: "0733 222 333",
-    status: "Inactive",
-  },
-];
+export default function ManagerEmployeesPage() {
+  const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
 
-const emptyForm = {
-  id: "",
-  name: "",
-  username: "",
-  phone: "",
-  role: "employee",
-  status: "Active",
-};
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    role: "",
+    phone: "",
+    status: "active",
+  });
 
-const ManagerEmployeesPage = () => {
-  const [rows, setRows] = useState(initialRows);
-  const [query, setQuery] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [editIndex, setEditIndex] = useState(null);
+  // ✅ Fetch employees
+  const loadEmployees = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getEmployees();
+      const list = res.data || [];
+      setEmployees(list);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (r) =>
-        r.id.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q) ||
-        r.username.toLowerCase().includes(q) ||
-        r.phone.toLowerCase().includes(q) ||
-        r.status.toLowerCase().includes(q)
-    );
-  }, [rows, query]);
-
-  const openCreate = () => {
-    setForm(emptyForm);
-    setEditIndex(null);
-    setShowModal(true);
-  };
-
-  const openEdit = (idx) => {
-    setForm(rows[idx]);
-    setEditIndex(idx);
-    setShowModal(true);
-  };
-
-  const removeRow = (idx) => {
-    const next = [...rows];
-    next.splice(idx, 1);
-    setRows(next);
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // simple required checks
-    if (!form.name || !form.username) return;
-
-    if (editIndex === null) {
-      // Create: generate simple ID
-      const nextId = `EMP-${String(rows.length + 1).padStart(3, "0")}`;
-      setRows([{ ...form, id: nextId }, ...rows]);
-    } else {
-      // Update
-      const next = [...rows];
-      next[editIndex] = form;
-      setRows(next);
+      const activeCount = list.filter((e) => e.status === "active").length;
+      setStats({
+        total: res.total || list.length,
+        active: activeCount,
+        inactive: (res.total || list.length) - activeCount,
+      });
+    } catch (err) {
+      console.error("Error loading employees:", err);
+      toast.error("Failed to load employees.");
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    setShowModal(false);
-    setForm(emptyForm);
-    setEditIndex(null);
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
+
+  // ✅ Handle input change
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // ✅ Save employee
+  const handleSave = async (e) => {
+    e.preventDefault(); // ⬅️ Prevent page reload
+    try {
+      if (editing) {
+        await updateEmployee(editing.id, form);
+        toast.success("Employee updated!");
+      } else {
+        await createEmployee(form);
+        toast.success("Employee added!");
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ name: "", role: "", phone: "", status: "active" });
+      loadEmployees();
+    } catch (err) {
+      console.error("Error saving employee:", err);
+      toast.error("Failed to save employee.");
+    }
   };
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Employees</h1>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Employees (Manager)</h1>
 
-        <div className="flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, username, phone…"
-            className="px-3 py-2 border rounded-md text-sm"
-          />
-          <button
-            onClick={openCreate}
-            className="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-          >
-            + Add Employee
-          </button>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <KPI icon={FiUsers} label="Total Employees" value={stats.total} />
+        </Card>
+        <Card>
+          <KPI icon={FiUserCheck} label="Active Employees" value={stats.active} />
+        </Card>
+        <Card>
+          <KPI icon={FiUserX} label="Inactive Employees" value={stats.inactive} />
+        </Card>
+      </div>
+
+      {/* Employees Table */}
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Employee List</h2>
+          <Button variant="primary" onClick={() => setShowForm(true)}>
+            Add Employee
+          </Button>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-white rounded shadow overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-gray-700">
-            <tr>
-              <th className="p-2 text-left">ID</th>
-              <th className="p-2 text-left">Name</th>
-              <th className="p-2 text-left">Username</th>
-              <th className="p-2 text-left">Phone</th>
-              <th className="p-2 text-left">Role</th>
-              <th className="p-2 text-left">Status</th>
-              <th className="p-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-3 text-center text-gray-500">
-                  No employees found
-                </td>
-              </tr>
-            ) : (
-              filtered.map((r, idx) => (
-                <tr key={r.id} className="border-t hover:bg-gray-50">
-                  <td className="p-2">{r.id}</td>
-                  <td className="p-2">{r.name}</td>
-                  <td className="p-2">{r.username}</td>
-                  <td className="p-2">{r.phone}</td>
-                  <td className="p-2 capitalize">{r.role}</td>
-                  <td className="p-2">
-                    <span
-                      className={
-                        r.status === "Active"
-                          ? "text-green-700 bg-green-100 px-2 py-0.5 rounded text-xs"
-                          : "text-gray-700 bg-gray-200 px-2 py-0.5 rounded text-xs"
-                      }
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="p-2 text-right">
-                    <button
-                      onClick={() => openEdit(idx)}
-                      className="px-2 py-1 text-indigo-600 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => removeRow(idx)}
-                      className="ml-3 px-2 py-1 text-red-600 hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        <DataTable
+          columns={[
+            { key: "name", label: "Name", sortable: true },
+            { key: "role", label: "Role" },
+            { key: "phone", label: "Phone" },
+            {
+              key: "status",
+              label: "Status",
+              render: (row) => (
+                <span
+                  className={`px-2 py-1 rounded text-xs ${
+                    row.status === "active"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {row.status}
+                </span>
+              ),
+            },
+          ]}
+          data={employees}
+          loading={loading}
+          rowActions={(row) => (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setEditing(row);
+                setForm({
+                  name: row.name,
+                  role: row.role,
+                  phone: row.phone,
+                  status: row.status,
+                });
+                setShowForm(true);
+              }}
+            >
+              Edit
+            </Button>
+          )}
+        />
+      </Card>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow w-full max-w-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">
-                {editIndex === null ? "Add Employee" : "Edit Employee"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+      {/* Modal Form */}
+      {showForm && (
+        <ModalCard
+          title={editing ? "Edit Employee" : "Add Employee"}
+          onClose={() => setShowForm(false)}
+        >
+          <form onSubmit={handleSave} className="space-y-3">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium">Full Name</label>
+              <input
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-full text-sm"
+              />
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block text-sm mb-1">Full Name</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm mb-1">Username</label>
-                  <input
-                    value={form.username}
-                    onChange={(e) =>
-                      setForm({ ...form, username: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Phone</label>
-                  <input
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm({ ...form, phone: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                    placeholder="07xx xxx xxx"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm mb-1">Role</label>
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                  >
-                    <option value="employee">Employee</option>
-                    <option value="manager">Manager</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm mb-1">Status</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border rounded-md text-sm"
-                  >
-                    <option>Active</option>
-                    <option>Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-3 py-2 rounded border text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
-                >
-                  {editIndex === null ? "Create" : "Save"}
-                </button>
-              </div>
-            </form>
-
-            <p className="text-xs text-gray-500 mt-3">
-              * This is UI-only for now — backend wiring (Flask) will replace
-              the local state with real API calls.
-            </p>
-          </div>
-        </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium">Role</label>
+              <input
+                name="role"
+                value={form.role}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-full text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium">Phone</label>
+              <input
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-full text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium">Status</label>
+              <select
+                name="status"
+                value={form.status}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-full text-sm"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="secondary" type="button" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit">
+                Save
+              </Button>
+            </div>
+          </form>
+        </ModalCard>
       )}
     </div>
   );
-};
-
-export default ManagerEmployeesPage;
+}

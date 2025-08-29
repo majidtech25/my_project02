@@ -1,117 +1,134 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { getReports } from "../../services/api";
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import Button from "../../components/shared/Button";
+import DataTable from "../../components/shared/DataTable";
+import { toast } from "react-toastify";
+import { FiDollarSign, FiCreditCard, FiFileText } from "react-icons/fi";
 
 export default function EmployerReportsPage() {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    sales: 0,
+    creditOpen: 0,
+    creditCleared: 0,
+  });
+  const [rows, setRows] = useState([]);
+  const [filters, setFilters] = useState({ from: "", to: "" });
 
-  async function refresh() {
+  // ✅ Fetch reports
+  const loadReports = useCallback(async () => {
     setLoading(true);
-    const res = await getReports({ from, to });
-    setReport(res);
-    setLoading(false);
-  }
+    try {
+      const res = await getReports(filters);
+      setStats(res.totals || {});
+      setRows(res.byDay || []);
+    } catch (err) {
+      console.error("Error loading reports:", err);
+      toast.error("Failed to load reports.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadReports();
+  }, [loadReports]);
+
+  // ✅ Handle filters
+  const handleChange = (e) => {
+    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // ✅ Export placeholders
+  const handleExport = (type) => {
+    toast.info(`Exporting report as ${type} (mock only)`);
+  };
 
   return (
-    <div className="p-4 space-y-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Reports</h1>
-        <div className="flex gap-2">
-          <button
-            className="px-3 py-2 rounded-xl border"
-            onClick={() => alert("Export CSV (mock)")}
-          >
-            Export CSV
-          </button>
-          <button
-            className="px-3 py-2 rounded-xl border"
-            onClick={() => alert("Export PDF (mock)")}
-          >
-            Export PDF
-          </button>
-        </div>
-      </header>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Reports</h1>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="grid text-sm">
-          From
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border rounded-xl px-3 py-2"
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <KPI
+            icon={FiDollarSign}
+            label="Total Sales (KES)"
+            value={stats.sales?.toLocaleString() || 0}
           />
-        </label>
-        <label className="grid text-sm">
-          To
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border rounded-xl px-3 py-2"
+        </Card>
+        <Card>
+          <KPI
+            icon={FiCreditCard}
+            label="Open Credit (KES)"
+            value={stats.creditOpen?.toLocaleString() || 0}
           />
-        </label>
-        <button onClick={refresh} className="px-3 py-2 rounded-xl border">
-          Apply
-        </button>
+        </Card>
+        <Card>
+          <KPI
+            icon={FiCreditCard}
+            label="Cleared Credit (KES)"
+            value={stats.creditCleared?.toLocaleString() || 0}
+          />
+        </Card>
       </div>
 
-      <section className="grid gap-3">
-        {loading ? (
-          <div>Loading…</div>
-        ) : report ? (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Stat label="Total Sales" value={report.totals.sales} />
-              <Stat label="Open Credit" value={report.totals.creditOpen} />
-              <Stat
-                label="Cleared Credit"
-                value={report.totals.creditCleared}
-              />
-            </div>
-            <div className="overflow-x-auto border rounded-2xl">
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left p-3">Date</th>
-                    <th className="text-right p-3">Sales</th>
-                    <th className="text-right p-3">Credit (Open)</th>
-                    <th className="text-right p-3">Credit (Cleared)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.byDay.map((d) => (
-                    <tr key={d.date} className="border-t">
-                      <td className="p-3">{d.date}</td>
-                      <td className="p-3 text-right">{d.sales}</td>
-                      <td className="p-3 text-right">{d.creditOpen}</td>
-                      <td className="p-3 text-right">{d.creditCleared}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          <div>No data</div>
-        )}
-      </section>
-    </div>
-  );
-}
+      {/* Filters */}
+      <Card>
+        <h2 className="text-lg font-semibold mb-2">Filters</h2>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-sm block mb-1">From</label>
+            <input
+              type="date"
+              name="from"
+              value={filters.from}
+              onChange={handleChange}
+              className="border rounded px-3 py-1 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-sm block mb-1">To</label>
+            <input
+              type="date"
+              name="to"
+              value={filters.to}
+              onChange={handleChange}
+              className="border rounded px-3 py-1 text-sm"
+            />
+          </div>
+          <Button variant="primary" onClick={loadReports}>
+            Apply
+          </Button>
+        </div>
+      </Card>
 
-function Stat({ label, value }) {
-  return (
-    <div className="rounded-2xl border p-4">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-2xl font-semibold">{value}</div>
+      {/* Reports Table */}
+      <Card>
+        <h2 className="text-lg font-semibold mb-2">Daily Breakdown</h2>
+        <DataTable
+          columns={[
+            { key: "date", label: "Date", sortable: true },
+            { key: "sales", label: "Sales (KES)", sortable: true },
+            { key: "creditOpen", label: "Open Credit", sortable: true },
+            { key: "creditCleared", label: "Cleared Credit", sortable: true },
+          ]}
+          data={rows}
+          loading={loading}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => handleExport("CSV")}>
+                Export CSV
+              </Button>
+              <Button variant="secondary" onClick={() => handleExport("PDF")}>
+                Export PDF
+              </Button>
+            </>
+          }
+        />
+      </Card>
     </div>
   );
 }

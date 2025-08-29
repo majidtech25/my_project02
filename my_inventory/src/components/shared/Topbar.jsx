@@ -1,44 +1,42 @@
-import React, { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+// src/components/shared/Topbar.jsx
+import React from "react";
+import { FiMoon, FiSun, FiUser } from "react-icons/fi";
+import useDarkMode from "../../hooks/useDarkMode";
 
-const Topbar = ({ role, onProfileClick }) => {
-  const { user, logout } = useAuth();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+export default function Topbar({ user, role, onProfileClick }) {
+  const { darkMode, toggleDarkMode } = useDarkMode();
 
   return (
-    <div className="flex justify-between items-center bg-white shadow px-6 py-3 relative">
-      <h1 className="text-lg font-semibold">{role} Dashboard</h1>
+    <header className="flex items-center justify-between bg-white dark:bg-gray-900 shadow px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+      {/* Title */}
+      <h1 className="text-lg font-semibold text-gray-800 dark:text-gray-100 capitalize">
+        {role} Dashboard
+      </h1>
 
-      <div className="flex items-center space-x-4">
+      {/* Right controls */}
+      <div className="flex items-center gap-4">
+        {/* Dark Mode Toggle */}
         <button
-          onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="text-gray-600"
+          onClick={toggleDarkMode}
+          className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
-          {user?.name || "John Doe"}
+          {darkMode ? <FiSun className="text-yellow-400" /> : <FiMoon />}
+          <span className="hidden md:inline text-sm">
+            {darkMode ? "Light" : "Dark"}
+          </span>
         </button>
 
-        {dropdownOpen && (
-          <div className="absolute right-6 top-12 bg-white border shadow rounded w-40">
-            <button
-              onClick={() => {
-                setDropdownOpen(false);
-                onProfileClick();
-              }}
-              className="block px-4 py-2 w-full text-left hover:bg-gray-100"
-            >
-              Profile
-            </button>
-            <button
-              onClick={logout}
-              className="block px-4 py-2 w-full text-left hover:bg-gray-100"
-            >
-              Logout
-            </button>
-          </div>
-        )}
+        {/* User Info / Profile */}
+        <button
+          onClick={onProfileClick}
+          className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <FiUser />
+          <span className="hidden md:inline text-sm">
+            {user?.name || "User"} ({role})
+          </span>
+        </button>
       </div>
-    </div>
+    </header>
   );
-};
-
-export default Topbar;
+}

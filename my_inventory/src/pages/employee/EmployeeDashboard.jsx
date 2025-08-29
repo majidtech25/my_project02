@@ -1,41 +1,92 @@
 // src/pages/employee/EmployeeDashboard.jsx
-import React from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { getReports, getCreditSummary } from "../../services/api";
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import DataTable from "../../components/shared/DataTable";
+import Button from "../../components/shared/Button";
+import { toast } from "react-toastify";
+import { FiDollarSign, FiCreditCard, FiTrendingUp } from "react-icons/fi";
 
-const EmployeeDashboard = () => {
+export default function EmployeeDashboard() {
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    salesToday: 0,
+    pendingCredits: 0,
+  });
+  const [recent, setRecent] = useState([]);
+
+  // ✅ Load employee dashboard data
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [reportsRes, creditsRes] = await Promise.all([
+        getReports(),
+        getCreditSummary({ tab: "open" }),
+      ]);
+
+      setStats({
+        salesToday: reportsRes?.totals?.sales || 0,
+        pendingCredits: creditsRes?.data?.length || 0,
+      });
+
+      setRecent(reportsRes?.byDay?.slice(-5) || []);
+    } catch (err) {
+      console.error("Error loading employee dashboard:", err);
+      toast.error("Failed to load employee dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  // ✅ Table columns
+  const columns = [
+    { key: "date", label: "Date", sortable: true },
+    { key: "sales", label: "Sales (KES)", sortable: true },
+    { key: "creditOpen", label: "Open Credit", sortable: true },
+    { key: "creditCleared", label: "Cleared Credit", sortable: true },
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <h1 className="text-2xl font-bold">Employee Dashboard</h1>
+      <h1 className="text-2xl font-semibold">Employee Dashboard</h1>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-white p-4 rounded shadow text-center">
-          <h2 className="text-lg font-semibold">New Sale</h2>
-          <p className="mt-2 text-blue-600 cursor-pointer">➕ Create</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow text-center">
-          <h2 className="text-lg font-semibold">Pending Bills</h2>
-          <p className="mt-2 text-yellow-600">5</p>
-        </div>
-        <div className="bg-white p-4 rounded shadow text-center">
-          <h2 className="text-lg font-semibold">Sales Today</h2>
-          <p className="mt-2 text-green-600">$1,200</p>
-        </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <KPI
+            icon={FiDollarSign}
+            label="Sales Today"
+            value={`KES ${stats.salesToday.toLocaleString()}`}
+          />
+        </Card>
+        <Card>
+          <KPI
+            icon={FiCreditCard}
+            label="Pending Credits"
+            value={stats.pendingCredits}
+          />
+        </Card>
       </div>
 
-      {/* Charts */}
-      <div className="bg-white p-6 rounded shadow h-64 flex items-center justify-center">
-        Chart: My Sales Performance
-      </div>
-
-      {/* Notes / Alerts */}
-      <div className="bg-blue-100 p-4 rounded">
-        <p className="text-blue-800">
-          ℹ Remember to close sales at end of day.
-        </p>
-      </div>
+      {/* Recent Sales */}
+      <Card>
+        <h2 className="text-lg font-semibold mb-2">Recent Sales (Last 5 Days)</h2>
+        <DataTable
+          columns={columns}
+          data={recent}
+          loading={loading}
+          actions={
+            <Button variant="primary" onClick={loadDashboard}>
+              Refresh
+            </Button>
+          }
+        />
+      </Card>
     </div>
   );
-};
-
-export default EmployeeDashboard;
+}

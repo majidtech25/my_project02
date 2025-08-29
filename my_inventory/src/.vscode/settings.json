@@ -1,0 +1,18 @@
+{
+  // Disable default CSS validation (conflicts with Tailwind v4 directives)
+  "css.validate": false,
+
+  // Enable Tailwind IntelliSense + point it to your config
+  "tailwindCSS.experimental.configFile": "./tailwind.config.js",
+
+  // Optional: enable class suggestions inside JSX/TSX
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+
+  // Optional: format Tailwind classes nicely when saving
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  }
+}

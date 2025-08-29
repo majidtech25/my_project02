@@ -1,210 +1,199 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { getProducts, createProduct, updateProduct } from "../../services/api";
-
-const CATEGORIES = ["all", "Detergents", "Beverages"];
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import Button from "../../components/shared/Button";
+import DataTable from "../../components/shared/DataTable";
+import { toast } from "react-toastify";
+import { FiBox, FiAlertTriangle } from "react-icons/fi";
 
 export default function EmployerProductsPage() {
-  const [category, setCategory] = useState("all");
-  const [search, setSearch] = useState("");
-  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [stats, setStats] = useState({ total: 0, lowStock: 0 });
+
+  // Modal state
+  const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: "", sku: "", category: "", price: "", stock: "" });
 
-  async function refresh() {
+  // ✅ Fetch products
+  const loadProducts = useCallback(async () => {
     setLoading(true);
-    const res = await getProducts({ category, search });
-    setRows(res.data);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      const res = await getProducts();
+      const data = res.data || [];
+      setProducts(data);
+      setStats({
+        total: data.length,
+        lowStock: data.filter((p) => p.stock < 10).length,
+      });
+    } catch (err) {
+      console.error("Error loading products:", err);
+      toast.error("Failed to load products.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const payload = {
-      name: form.get("name"),
-      sku: form.get("sku"),
-      category: form.get("category"),
-      price: Number(form.get("price")),
-      stock: Number(form.get("stock")),
-    };
-    if (editing) await updateProduct(editing.id, payload);
-    else await createProduct(payload);
-    setModalOpen(false);
-    setEditing(null);
-    await refresh();
-  }
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  // ✅ Handle input change
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // ✅ Save product
+  const handleSave = async () => {
+    try {
+      if (editing) {
+        await updateProduct(editing.id, form);
+        toast.success("Product updated successfully!");
+      } else {
+        await createProduct(form);
+        toast.success("Product added successfully!");
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ name: "", sku: "", category: "", price: "", stock: "" });
+      loadProducts();
+    } catch (err) {
+      console.error("Error saving product:", err);
+      toast.error("Failed to save product.");
+    }
+  };
 
   return (
-    <div className="p-4 space-y-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Products</h1>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          className="px-3 py-2 rounded-2xl shadow bg-black text-white"
-        >
-          Add Product
-        </button>
-      </header>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Products & Categories</h1>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="inline-flex rounded-xl border overflow-hidden">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-3 py-2 ${category === c ? "bg-gray-900 text-white" : "bg-white"}`}
-            >
-              {c}
-            </button>
-          ))}
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <KPI icon={FiBox} label="Total Products" value={stats.total} />
+        </Card>
+        <Card>
+          <KPI
+            icon={FiAlertTriangle}
+            label="Low Stock (<10)"
+            value={stats.lowStock}
+          />
+        </Card>
+      </div>
+
+      {/* Products Table */}
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Product List</h2>
+          <Button variant="primary" onClick={() => setShowForm(true)}>
+            Add Product
+          </Button>
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search product…"
-          className="border rounded-xl px-3 py-2"
-          aria-label="Search products"
-        />
-        <button onClick={refresh} className="px-3 py-2 rounded-xl border">
-          Apply
-        </button>
-      </div>
 
-      <div className="overflow-x-auto border rounded-2xl">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">SKU</th>
-              <th className="text-left p-3">Category</th>
-              <th className="text-right p-3">Price</th>
-              <th className="text-right p-3">Stock</th>
-              <th className="text-right p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="p-4" colSpan={6}>
-                  Loading…
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td className="p-4" colSpan={6}>
-                  No results
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-3">{r.name}</td>
-                  <td className="p-3">{r.sku}</td>
-                  <td className="p-3">{r.category}</td>
-                  <td className="p-3 text-right">{r.price}</td>
-                  <td className="p-3 text-right">{r.stock}</td>
-                  <td className="p-3 text-right">
-                    <button
-                      className="px-2 py-1 rounded-lg border"
-                      onClick={() => {
-                        setEditing(r);
-                        setModalOpen(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        <DataTable
+          columns={[
+            { key: "name", label: "Name", sortable: true },
+            { key: "sku", label: "SKU" },
+            { key: "category", label: "Category" },
+            { key: "price", label: "Price (KES)", sortable: true },
+            {
+              key: "stock",
+              label: "Stock",
+              sortable: true,
+              render: (row) => (
+                <span
+                  className={`px-2 py-1 rounded text-xs ${
+                    row.stock < 10
+                      ? "bg-red-100 text-red-700"
+                      : "bg-green-100 text-green-700"
+                  }`}
+                >
+                  {row.stock}
+                </span>
+              ),
+            },
+          ]}
+          data={products}
+          loading={loading}
+          rowActions={(row) => (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setEditing(row);
+                setForm({
+                  name: row.name,
+                  sku: row.sku,
+                  category: row.category,
+                  price: row.price,
+                  stock: row.stock,
+                });
+                setShowForm(true);
+              }}
+            >
+              Edit
+            </Button>
+          )}
+        />
+      </Card>
 
       {/* Add/Edit Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center p-4 z-50">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">{editing ? "Edit Product" : "Add Product"}</h2>
-              <button
-                onClick={() => {
-                  setModalOpen(false);
-                  setEditing(null);
-                }}
-                className="px-2 py-1"
-                aria-label="Close"
-              >
-                ✕
-              </button>
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 space-y-4 shadow-lg">
+            <h2 className="text-lg font-semibold">
+              {editing ? "Edit Product" : "Add Product"}
+            </h2>
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Product Name"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              name="sku"
+              value={form.sku}
+              onChange={handleChange}
+              placeholder="SKU"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              placeholder="Category"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="number"
+              name="price"
+              value={form.price}
+              onChange={handleChange}
+              placeholder="Price"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="number"
+              name="stock"
+              value={form.stock}
+              onChange={handleChange}
+              placeholder="Stock"
+              className="w-full border rounded px-3 py-2"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSave}>
+                Save
+              </Button>
             </div>
-            <form onSubmit={onSubmit} className="grid gap-3">
-              <input
-                name="name"
-                defaultValue={editing?.name || ""}
-                placeholder="Name"
-                className="border rounded-xl px-3 py-2"
-                required
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  name="sku"
-                  defaultValue={editing?.sku || ""}
-                  placeholder="SKU"
-                  className="border rounded-xl px-3 py-2"
-                  required
-                />
-                <select
-                  name="category"
-                  defaultValue={editing?.category || "Detergents"}
-                  className="border rounded-xl px-3 py-2"
-                >
-                  <option>Detergents</option>
-                  <option>Beverages</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  name="price"
-                  type="number"
-                  step="0.01"
-                  defaultValue={editing?.price ?? 0}
-                  placeholder="Price"
-                  className="border rounded-xl px-3 py-2"
-                  required
-                />
-                <input
-                  name="stock"
-                  type="number"
-                  defaultValue={editing?.stock ?? 0}
-                  placeholder="Stock"
-                  className="border rounded-xl px-3 py-2"
-                  required
-                />
-              </div>
-              <div className="flex gap-2 justify-end mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalOpen(false);
-                    setEditing(null);
-                  }}
-                  className="px-3 py-2 rounded-xl border"
-                >
-                  Cancel
-                </button>
-                <button className="px-3 py-2 rounded-2xl shadow bg-black text-white">Save</button>
-              </div>
-            </form>
           </div>
         </div>
       )}

@@ -1,37 +1,49 @@
 // src/components/shared/Sidebar.jsx
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { FiLogOut } from "react-icons/fi";
+import { useAuth } from "../../context/AuthContext";
 import menuConfig from "../../config/menuConfig";
 
-const Sidebar = ({ role = "employee" }) => {
-  const items = menuConfig[role] || [];
+const Sidebar = ({ role }) => {
+  const { logout } = useAuth();
+  const menuItems = menuConfig?.[role] || []; // ✅ safe access
 
   return (
-    <aside className="w-64 bg-blue-900 text-white min-h-screen p-4">
-      <h2 className="text-xl font-bold mb-6">IMS</h2>
+    <aside className="flex flex-col w-64 bg-gradient-to-b from-blue-900 to-blue-700 text-white min-h-screen">
+      {/* Logo */}
+      <div className="p-4 text-lg font-bold border-b border-blue-600">
+        IMS
+      </div>
 
-      {items.length > 0 ? (
-        <ul className="space-y-2">
-          {items.map(({ path, label, icon: Icon }) => (
-            <li key={path}>
-              <NavLink
-                to={path}
-                end
-                className={({ isActive }) =>
-                  `flex items-center p-2 rounded transition ${
-                    isActive ? "bg-blue-700" : "hover:bg-blue-700"
-                  }`
-                }
-              >
-                {Icon ? <Icon className="mr-3" /> : null}
-                <span>{label}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-blue-200/80 text-sm">No menu available</p>
-      )}
+      {/* Navigation */}
+      <nav className="flex-1 p-2">
+        {menuItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
+                isActive ? "bg-blue-600" : "hover:bg-blue-500"
+              }`
+            }
+          >
+            <item.icon className="w-5 h-5" />
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Logout */}
+      <div className="p-4 border-t border-blue-600">
+        <button
+          onClick={logout}
+          className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-red-600 bg-red-500 transition-colors w-full"
+        >
+          <FiLogOut />
+          Logout
+        </button>
+      </div>
     </aside>
   );
 };

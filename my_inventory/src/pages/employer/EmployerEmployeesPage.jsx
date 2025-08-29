@@ -1,205 +1,165 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/employer/EmployerEmployeesPage.jsx
+import React, { useEffect, useState, useCallback } from "react";
 import { getEmployees, createEmployee, updateEmployee } from "../../services/api";
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import Button from "../../components/shared/Button";
+import DataTable from "../../components/shared/DataTable";
+import { toast } from "react-toastify";
+import { FiUsers, FiUserCheck, FiUserX } from "react-icons/fi";
 
 export default function EmployerEmployeesPage() {
-  const [query, setQuery] = useState("");
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
+
+  // Modal state
+  const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: "", role: "", phone: "" });
 
-  const title = useMemo(() => (editing ? "Edit Employee" : "Add Employee"), [editing]);
-
-  async function refresh() {
+  // ✅ Fetch employees
+  const loadEmployees = useCallback(async () => {
     setLoading(true);
-    const res = await getEmployees({ search: query });
-    setRows(res.data);
-    setTotal(res.total);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      const res = await getEmployees();
+      setEmployees(res.data || []);
+      const activeCount = res.data.filter((e) => e.status === "active").length;
+      setStats({
+        total: res.total || 0,
+        active: activeCount,
+        inactive: res.total - activeCount,
+      });
+    } catch (err) {
+      console.error("Error loading employees:", err);
+      toast.error("Failed to load employees.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const payload = {
-      name: form.get("name"),
-      role: form.get("role"),
-      phone: form.get("phone"),
-      status: form.get("status"),
-    };
-    if (editing) {
-      await updateEmployee(editing.id, payload);
-    } else {
-      await createEmployee(payload);
+  useEffect(() => {
+    loadEmployees();
+  }, [loadEmployees]);
+
+  // ✅ Handle form input
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // ✅ Save employee
+  const handleSave = async () => {
+    try {
+      if (editing) {
+        await updateEmployee(editing.id, form);
+        toast.success("Employee updated successfully!");
+      } else {
+        await createEmployee(form);
+        toast.success("Employee added successfully!");
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ name: "", role: "", phone: "" });
+      loadEmployees();
+    } catch (err) {
+      console.error("Error saving employee:", err);
+      toast.error("Failed to save employee.");
     }
-    setModalOpen(false);
-    setEditing(null);
-    await refresh();
-  }
+  };
 
   return (
-    <div className="p-4 space-y-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Employees</h1>
-        <button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          className="px-3 py-2 rounded-2xl shadow bg-black text-white"
-        >
-          Add Employee
-        </button>
-      </header>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Manage Employees</h1>
 
-      <div className="flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name..."
-          className="input input-bordered w-full max-w-md border rounded-xl px-3 py-2"
-          aria-label="Search employees by name"
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <KPI icon={FiUsers} label="Total Employees" value={stats.total} />
+        </Card>
+        <Card>
+          <KPI icon={FiUserCheck} label="Active" value={stats.active} />
+        </Card>
+        <Card>
+          <KPI icon={FiUserX} label="Inactive" value={stats.inactive} />
+        </Card>
+      </div>
+
+      {/* Employees Table */}
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Employees</h2>
+          <Button variant="primary" onClick={() => setShowForm(true)}>
+            Add Employee
+          </Button>
+        </div>
+
+        <DataTable
+          columns={[
+            { key: "name", label: "Name", sortable: true },
+            { key: "role", label: "Role" },
+            { key: "phone", label: "Phone" },
+            { key: "status", label: "Status" },
+          ]}
+          data={employees}
+          loading={loading}
+          rowActions={(row) => (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setEditing(row);
+                setForm({ name: row.name, role: row.role, phone: row.phone });
+                setShowForm(true);
+              }}
+            >
+              Edit
+            </Button>
+          )}
         />
-        <button onClick={refresh} className="px-3 py-2 rounded-xl border">
-          Search
-        </button>
-      </div>
-
-      <div className="overflow-x-auto border rounded-2xl">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left p-3">Name</th>
-              <th className="text-left p-3">Role</th>
-              <th className="text-left p-3">Phone</th>
-              <th className="text-left p-3">Status</th>
-              <th className="text-right p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="p-4" colSpan={5}>
-                  Loading…
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td className="p-4" colSpan={5}>
-                  No results
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-3">{r.name}</td>
-                  <td className="p-3">{r.role}</td>
-                  <td className="p-3">{r.phone}</td>
-                  <td className="p-3">
-                    <span
-                      className={
-                        "px-2 py-1 rounded-full text-xs " +
-                        (r.status === "active" ? "bg-green-100" : "bg-gray-200")
-                      }
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right">
-                    <button
-                      className="px-2 py-1 rounded-lg border"
-                      onClick={() => {
-                        setEditing(r);
-                        setModalOpen(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      </Card>
 
       {/* Add/Edit Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 bg-black/40 grid place-items-center p-4 z-50">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-semibold">{title}</h2>
-              <button
-                onClick={() => {
-                  setModalOpen(false);
-                  setEditing(null);
-                }}
-                className="px-2 py-1"
-                aria-label="Close"
-              >
-                ✕
-              </button>
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 space-y-4 shadow-lg">
+            <h2 className="text-lg font-semibold">
+              {editing ? "Edit Employee" : "Add Employee"}
+            </h2>
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Full Name"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              name="role"
+              value={form.role}
+              onChange={handleChange}
+              placeholder="Role"
+              className="w-full border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              name="phone"
+              value={form.phone}
+              onChange={handleChange}
+              placeholder="Phone Number"
+              className="w-full border rounded px-3 py-2"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSave}>
+                Save
+              </Button>
             </div>
-            <form onSubmit={onSubmit} className="grid gap-3">
-              <input
-                name="name"
-                defaultValue={editing?.name || ""}
-                placeholder="Full name"
-                className="border rounded-xl px-3 py-2"
-                required
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  name="phone"
-                  defaultValue={editing?.phone || ""}
-                  placeholder="Phone"
-                  className="border rounded-xl px-3 py-2"
-                  required
-                />
-                <select
-                  name="role"
-                  defaultValue={editing?.role || "Cashier"}
-                  className="border rounded-xl px-3 py-2"
-                >
-                  <option>Cashier</option>
-                  <option>Supervisor</option>
-                </select>
-              </div>
-              <select
-                name="status"
-                defaultValue={editing?.status || "active"}
-                className="border rounded-xl px-3 py-2"
-              >
-                <option value="active">active</option>
-                <option value="inactive">inactive</option>
-              </select>
-              <div className="flex gap-2 justify-end mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalOpen(false);
-                    setEditing(null);
-                  }}
-                  className="px-3 py-2 rounded-xl border"
-                >
-                  Cancel
-                </button>
-                <button className="px-3 py-2 rounded-2xl shadow bg-black text-white">
-                  Save
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
-
-      <footer className="text-xs text-gray-500">Total: {total}</footer>
     </div>
   );
 }

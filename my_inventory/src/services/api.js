@@ -1,12 +1,41 @@
-// Mock API service for IMS frontend (UI-only).
-// Replace with real Flask endpoints later.
+// src/services/api.js
+// Backend-ready API service for IMS frontend.
+// Uses Flask backend if available, else falls back to mock data.
 
-// ================== EMPLOYEES ==================
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+// Small helper for backend requests
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(
+      "API request failed, falling back to mock:",
+      endpoint,
+      err.message
+    );
+    return null; // Signals fallback
+  }
+}
+
+/* ================== EMPLOYEES ================== */
 export async function getEmployees({
   search = "",
   page = 1,
   pageSize = 10,
 } = {}) {
+  const res = await apiFetch(
+    `/employees?search=${search}&page=${page}&pageSize=${pageSize}`
+  );
+  if (res) return res;
+
+  // Mock fallback
   await new Promise((r) => setTimeout(r, 250));
   const all = [
     {
@@ -41,17 +70,32 @@ export async function getEmployees({
 }
 
 export async function createEmployee(payload) {
+  const res = await apiFetch("/employees", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return { id: Math.floor(Math.random() * 10000), ...payload };
 }
 
 export async function updateEmployee(id, payload) {
+  const res = await apiFetch(`/employees/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return { id, ...payload };
 }
 
-// ================== PRODUCTS ==================
+/* ================== PRODUCTS ================== */
 export async function getProducts({ category = "all", search = "" } = {}) {
+  const res = await apiFetch(`/products?category=${category}&search=${search}`);
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   const all = [
     {
@@ -95,16 +139,31 @@ export async function getProducts({ category = "all", search = "" } = {}) {
 }
 
 export async function createProduct(payload) {
+  const res = await apiFetch("/products", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return { id: Math.floor(Math.random() * 10000), ...payload };
 }
 
 export async function updateProduct(id, payload) {
+  const res = await apiFetch(`/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return { id, ...payload };
 }
 
 export async function getCategories() {
+  const res = await apiFetch("/categories");
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 200));
   return [
     { id: 1, name: "Beverages" },
@@ -114,71 +173,80 @@ export async function getCategories() {
   ];
 }
 
-// ================== SUPPLIERS ==================
-let suppliers = [
-  {
-    id: 1,
-    name: "Unilever",
-    contact: "0712000111",
-    email: "info@unilever.com",
-    balance: 5000,
-  },
-  {
-    id: 2,
-    name: "Coca-Cola",
-    contact: "0712000222",
-    email: "sales@cocacola.com",
-    balance: 12000,
-  },
-  {
-    id: 3,
-    name: "Brookside",
-    contact: "0712000333",
-    email: "support@brookside.com",
-    balance: 8000,
-  },
-];
-
+/* ================== SUPPLIERS ================== */
 export async function getSuppliers({ search = "" } = {}) {
+  const res = await apiFetch(`/suppliers?search=${search}`);
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  let list = suppliers;
-  if (search) {
-    list = list.filter(
-      (s) =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.contact.includes(search)
-    );
-  }
-  return { data: list };
+  return {
+    data: [
+      {
+        id: 1,
+        name: "Unilever",
+        contact: "0712000111",
+        email: "info@unilever.com",
+        balance: 5000,
+      },
+      {
+        id: 2,
+        name: "Coca-Cola",
+        contact: "0712000222",
+        email: "sales@cocacola.com",
+        balance: 12000,
+      },
+      {
+        id: 3,
+        name: "Brookside",
+        contact: "0712000333",
+        email: "support@brookside.com",
+        balance: 8000,
+      },
+    ],
+  };
 }
 
 export async function createSupplier(payload) {
+  const res = await apiFetch("/suppliers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  const newSupplier = {
-    id: Math.floor(Math.random() * 10000),
-    balance: 0,
-    ...payload,
-  };
-  suppliers.push(newSupplier);
-  return newSupplier;
+  return { id: Math.floor(Math.random() * 10000), balance: 0, ...payload };
 }
 
 export async function updateSupplier(id, payload) {
+  const res = await apiFetch(`/suppliers/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  suppliers = suppliers.map((s) => (s.id === id ? { ...s, ...payload } : s));
-  return suppliers.find((s) => s.id === id);
+  return { id, ...payload };
 }
 
 export async function recordSupplierPayment(id, amount) {
+  const res = await apiFetch(`/suppliers/${id}/payments`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  suppliers = suppliers.map((s) =>
-    s.id === id ? { ...s, balance: Math.max(0, s.balance - amount) } : s
-  );
-  return suppliers.find((s) => s.id === id);
+  return { id, balance: 0 };
 }
 
-// ================== SALES / POS ==================
+/* ================== SALES ================== */
 export async function createSale(order) {
+  const res = await apiFetch("/sales", {
+    method: "POST",
+    body: JSON.stringify(order),
+  });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 500));
   return {
     success: true,
@@ -186,8 +254,12 @@ export async function createSale(order) {
     ...order,
   };
 }
-// ================== CREDIT ==================
+
+/* ================== CREDIT ================== */
 export async function getCreditSummary({ tab = "open", search = "" } = {}) {
+  const res = await apiFetch(`/credits?tab=${tab}&search=${search}`);
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   const open = [
     {
@@ -215,51 +287,35 @@ export async function getCreditSummary({ tab = "open", search = "" } = {}) {
       staff: "Cynthia Wanja",
     },
   ];
-  let list = tab === "open" ? open : cleared;
-  if (search)
-    list = list.filter((x) =>
-      x.customer.toLowerCase().includes(search.toLowerCase())
-    );
-  return { data: list };
+  return { data: tab === "open" ? open : cleared };
 }
 
 export async function markCreditCleared(id) {
+  const res = await apiFetch(`/credits/${id}/clear`, { method: "POST" });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return { ok: true, id };
 }
 
 export async function clearPendingBill(id) {
-  // ✅ Alias for Employee page
   return markCreditCleared(id);
 }
-// Alias to match existing imports
 export { getCreditSummary as getCreditsSummary };
 
-// ================== REPORTS ==================
+/* ================== REPORTS ================== */
 export async function getReports({ from, to } = {}) {
+  const res = await apiFetch(`/reports?from=${from}&to=${to}`);
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return {
     range: { from, to },
     totals: { sales: 124000, creditOpen: 4680, creditCleared: 8120 },
     byDay: [
-      {
-        date: "2025-08-19",
-        sales: 24000,
-        creditOpen: 0,
-        creditCleared: 1200,
-      },
-      {
-        date: "2025-08-20",
-        sales: 34000,
-        creditOpen: 1260,
-        creditCleared: 0,
-      },
-      {
-        date: "2025-08-21",
-        sales: 30000,
-        creditOpen: 0,
-        creditCleared: 3200,
-      },
+      { date: "2025-08-19", sales: 24000, creditOpen: 0, creditCleared: 1200 },
+      { date: "2025-08-20", sales: 34000, creditOpen: 1260, creditCleared: 0 },
+      { date: "2025-08-21", sales: 30000, creditOpen: 0, creditCleared: 3200 },
       {
         date: "2025-08-22",
         sales: 36000,
@@ -270,8 +326,11 @@ export async function getReports({ from, to } = {}) {
   };
 }
 
-// ================== SALES OVERVIEW (Employer) ==================
+/* ================== SALES OVERVIEW (Employer) ================== */
 export async function getSalesOverview() {
+  const res = await apiFetch("/sales/overview");
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
   return {
     today: { sales: 15000, orders: 45, credit: 3200 },
@@ -281,92 +340,53 @@ export async function getSalesOverview() {
       { name: "Milk 500ml", sold: 22 },
     ],
     recent: [
-      {
-        date: "2025-08-23",
-        employee: "Alice",
-        payment: "Cash",
-        total: 2500,
-      },
-      {
-        date: "2025-08-23",
-        employee: "Brian",
-        payment: "Card",
-        total: 4000,
-      },
+      { date: "2025-08-23", employee: "Alice", payment: "Cash", total: 2500 },
+      { date: "2025-08-23", employee: "Brian", payment: "Card", total: 4000 },
     ],
   };
 }
 
-// ================== DAY CONTROL ==================
-let currentDay = {
-  date: "2025-08-25",
-  isOpen: false,
-  openedBy: null,
-  closedBy: null,
-};
-
-let history = [
-  {
-    date: "2025-08-20",
-    openedBy: "Manager A",
-    closedBy: "Manager A",
-    status: "Closed",
-  },
-  {
-    date: "2025-08-21",
-    openedBy: "Manager B",
-    closedBy: "Manager B",
-    status: "Closed",
-  },
-  {
-    date: "2025-08-22",
-    openedBy: "Manager C",
-    closedBy: "Manager C",
-    status: "Closed",
-  },
-];
-
+/* ================== DAY CONTROL ================== */
 export async function getDayStatus() {
+  const res = await apiFetch("/day/status");
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  return currentDay;
+  return { date: "2025-08-25", isOpen: false, openedBy: null, closedBy: null };
 }
 
 export async function openSalesDay() {
+  const res = await apiFetch("/day/open", { method: "POST" });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  if (currentDay.isOpen) {
-    return { success: false, message: "Day already open" };
-  }
-  currentDay = {
+  return {
+    success: true,
     date: new Date().toISOString().split("T")[0],
     isOpen: true,
     openedBy: "Manager",
     closedBy: null,
   };
-  history.unshift({
-    date: currentDay.date,
-    openedBy: currentDay.openedBy,
-    closedBy: null,
-    status: "Open",
-  });
-  return { success: true, ...currentDay };
 }
 
 export async function closeSalesDay() {
+  const res = await apiFetch("/day/close", { method: "POST" });
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 250));
-  if (!currentDay.isOpen) {
-    return { success: false, message: "No open day to close" };
-  }
-  currentDay.isOpen = false;
-  currentDay.closedBy = "Manager";
-  history = history.map((h) =>
-    h.date === currentDay.date
-      ? { ...h, closedBy: "Manager", status: "Closed" }
-      : h
-  );
-  return { success: true, ...currentDay };
+  return {
+    success: true,
+    date: new Date().toISOString().split("T")[0],
+    isOpen: false,
+    openedBy: "Manager",
+    closedBy: "Manager",
+  };
 }
 
 export async function getDayHistory() {
+  const res = await apiFetch("/day/history");
+  if (res) return res;
+
   await new Promise((r) => setTimeout(r, 200));
   return [
     {
@@ -387,3 +407,4 @@ export async function getDayHistory() {
     },
   ];
 }
+   

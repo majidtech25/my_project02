@@ -11,13 +11,13 @@ const DashboardLayout = ({ role }) => {
   const [showProfile, setShowProfile] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <Sidebar role={role} />
 
       {/* Main Content */}
       <div className="flex flex-col flex-1">
-        {/* Topbar with dark mode + profile */}
+        {/* Topbar (only profile now) */}
         <Topbar
           user={user}
           role={role}

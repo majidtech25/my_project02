@@ -1,0 +1,26 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[requires]
+python_version = "3.10"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+sqlalchemy = "*"
+alembic = "*"
+pydantic = "*"
+email-validator = "*"
+python-multipart = "*"
+passlib = {extras = ["bcrypt"], version = "*"}       # password hashing
+python-jose = {extras = ["cryptography"], version = "*"}  # JWT tokens
+python-dateutil = "*"
+bcrypt = "==4.0.1"
+
+[dev-packages]
+pytest = "*"        # for testing
+httpx = "*"         # for async API tests
+black = "*"         # code formatter
+isort = "*"         # import sorting

@@ -1,0 +1,25 @@
+ # Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# SQLite databases (local only, not needed in Git)
+*.db
+*.sqlite3
+
+# Alembic caches
+migrations/__pycache__/
+migrations/versions/__pycache__/
+
+# IDE/editor junk
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db

@@ -1,18 +1,48 @@
 // src/services/api.js
 // Backend-ready API service for IMS frontend.
-// Uses Flask backend if available, else falls back to mock data.
+// Now integrated with FastAPI backend + JWT authentication.
 
 const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
-// Small helper for backend requests
+// ===== Token Helpers =====
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function setToken(token) {
+  localStorage.setItem("token", token);
+}
+
+function clearToken() {
+  localStorage.removeItem("token");
+}
+
+// ===== Central Fetch Wrapper =====
 async function apiFetch(endpoint, options = {}) {
+  const token = getToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
   try {
     const res = await fetch(`${BASE_URL}${endpoint}`, {
-      headers: { "Content-Type": "application/json" },
       ...options,
+      headers,
     });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+    if (res.status === 401) {
+      clearToken();
+      throw new Error("Unauthorized, please login again");
+    }
+
+    if (!res.ok) {
+      const errMsg = await res.text();
+      throw new Error(`API error: ${res.status} - ${errMsg}`);
+    }
+
     return await res.json();
   } catch (err) {
     console.warn(
@@ -20,57 +50,60 @@ async function apiFetch(endpoint, options = {}) {
       endpoint,
       err.message
     );
-    return null; // Signals fallback
+    return null; // Fallback will be used
   }
 }
 
+/* ================== AUTH ================== */
+export async function loginApi(phone, password) {
+  try {
+    const res = await fetch(`${BASE_URL}/auth/login-json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, password }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Invalid phone or password");
+    }
+
+    const data = await res.json();
+    if (data.access_token) {
+      setToken(data.access_token);
+    }
+    return data;
+  } catch (err) {
+    throw new Error(err.message || "Login failed");
+  }
+}
+
+export function logoutApi() {
+  clearToken();
+}
+
 /* ================== EMPLOYEES ================== */
-export async function getEmployees({
-  search = "",
-  page = 1,
-  pageSize = 10,
-} = {}) {
-  const res = await apiFetch(
-    `/employees?search=${search}&page=${page}&pageSize=${pageSize}`
-  );
+export async function getEmployees({ skip = 0, limit = 10 } = {}) {
+  const res = await apiFetch(`/employees?skip=${skip}&limit=${limit}`);
   if (res) return res;
 
   // Mock fallback
   await new Promise((r) => setTimeout(r, 250));
-  const all = [
-    {
-      id: 1,
-      name: "Amina Yusuf",
-      role: "Cashier",
-      phone: "0712 000111",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Brian Otieno",
-      role: "Cashier",
-      phone: "0712 000222",
-      status: "inactive",
-    },
-    {
-      id: 3,
-      name: "Cynthia Wanja",
-      role: "Supervisor",
-      phone: "0712 000333",
-      status: "active",
-    },
-  ];
-  const filtered = all.filter((e) =>
-    e.name.toLowerCase().includes(search.toLowerCase())
-  );
   return {
-    data: filtered.slice((page - 1) * pageSize, page * pageSize),
-    total: filtered.length,
+    data: [
+      {
+        id: 1,
+        name: "Deno Employer",
+        role: "employer",
+        phone: "0712000111",
+        stauts: "active",
+      },
+    ],
+    total: 1,
   };
 }
 
 export async function createEmployee(payload) {
-  const res = await apiFetch("/employees", {
+  const res = await apiFetch("/employees/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -228,17 +261,6 @@ export async function updateSupplier(id, payload) {
   return { id, ...payload };
 }
 
-export async function recordSupplierPayment(id, amount) {
-  const res = await apiFetch(`/suppliers/${id}/payments`, {
-    method: "POST",
-    body: JSON.stringify({ amount }),
-  });
-  if (res) return res;
-
-  await new Promise((r) => setTimeout(r, 250));
-  return { id, balance: 0 };
-}
-
 /* ================== SALES ================== */
 export async function createSale(order) {
   const res = await apiFetch("/sales", {
@@ -255,7 +277,7 @@ export async function createSale(order) {
   };
 }
 
-/* ================== CREDIT ================== */
+/* ================== CREDITS ================== */
 export async function getCreditSummary({ tab = "open", search = "" } = {}) {
   const res = await apiFetch(`/credits?tab=${tab}&search=${search}`);
   if (res) return res;
@@ -316,12 +338,6 @@ export async function getReports({ from, to } = {}) {
       { date: "2025-08-19", sales: 24000, creditOpen: 0, creditCleared: 1200 },
       { date: "2025-08-20", sales: 34000, creditOpen: 1260, creditCleared: 0 },
       { date: "2025-08-21", sales: 30000, creditOpen: 0, creditCleared: 3200 },
-      {
-        date: "2025-08-22",
-        sales: 36000,
-        creditOpen: 3420,
-        creditCleared: 3720,
-      },
     ],
   };
 }
@@ -339,16 +355,12 @@ export async function getSalesOverview() {
       { name: "Sunlight Detergent 1kg", sold: 15 },
       { name: "Milk 500ml", sold: 22 },
     ],
-    recent: [
-      { date: "2025-08-23", employee: "Alice", payment: "Cash", total: 2500 },
-      { date: "2025-08-23", employee: "Brian", payment: "Card", total: 4000 },
-    ],
   };
 }
 
 /* ================== DAY CONTROL ================== */
 export async function getDayStatus() {
-  const res = await apiFetch("/day/status");
+  const res = await apiFetch("/days/status");
   if (res) return res;
 
   await new Promise((r) => setTimeout(r, 250));
@@ -356,7 +368,7 @@ export async function getDayStatus() {
 }
 
 export async function openSalesDay() {
-  const res = await apiFetch("/day/open", { method: "POST" });
+  const res = await apiFetch("/days/open", { method: "POST" });
   if (res) return res;
 
   await new Promise((r) => setTimeout(r, 250));
@@ -370,7 +382,7 @@ export async function openSalesDay() {
 }
 
 export async function closeSalesDay() {
-  const res = await apiFetch("/day/close", { method: "POST" });
+  const res = await apiFetch("/days/close", { method: "POST" });
   if (res) return res;
 
   await new Promise((r) => setTimeout(r, 250));
@@ -384,7 +396,7 @@ export async function closeSalesDay() {
 }
 
 export async function getDayHistory() {
-  const res = await apiFetch("/day/history");
+  const res = await apiFetch("/days/history");
   if (res) return res;
 
   await new Promise((r) => setTimeout(r, 200));
@@ -407,4 +419,11 @@ export async function getDayHistory() {
     },
   ];
 }
-   
+
+// ================== PASSWORD ==================
+export async function changePassword(userId, newPassword) {
+  return await apiFetch(`/employees/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ password: newPassword }),
+  });
+}

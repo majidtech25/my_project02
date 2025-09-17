@@ -5,16 +5,15 @@ import { FiLogOut } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import menuConfig from "../../config/menuConfig";
 
-const Sidebar = ({ role }) => {
-  const { logout } = useAuth();
-  const menuItems = menuConfig?.[role] || []; // ✅ safe access
+const Sidebar = () => {
+  const { user, logout } = useAuth();
+  const role = user?.role || "guest"; // fallback in case no user
+  const menuItems = menuConfig?.[role] || [];
 
   return (
     <aside className="flex flex-col w-64 bg-gradient-to-b from-blue-900 to-blue-700 text-white min-h-screen">
       {/* Logo */}
-      <div className="p-4 text-lg font-bold border-b border-blue-600">
-        IMS
-      </div>
+      <div className="p-4 text-lg font-bold border-b border-blue-600">IMS</div>
 
       {/* Navigation */}
       <nav className="flex-1 p-2">

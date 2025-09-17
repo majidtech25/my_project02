@@ -1,3 +1,4 @@
+// src/pages/employee/PendingBillsPage.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import { getCreditSummary } from "../../services/api";
 import Card from "../../components/shared/Card";
@@ -17,7 +18,7 @@ export default function PendingBillsPage() {
     setLoading(true);
     try {
       const res = await getCreditSummary({ tab: "open" });
-      const data = res.data || [];
+      const data = res?.data || [];
       setBills(data);
       setStats({
         total: data.length,
@@ -35,9 +36,15 @@ export default function PendingBillsPage() {
     loadBills();
   }, [loadBills]);
 
-  // ✅ Request clearance (mock)
+  // ✅ Request clearance (single or bulk)
   const requestClearance = (id) => {
-    toast.info(`Clearance request sent for bill ${id} (awaiting manager approval).`);
+    toast.info(
+      `Clearance request sent for bill ${id} (awaiting manager approval).`
+    );
+  };
+
+  const requestBulkClearance = (ids) => {
+    toast.success(`Clearance requests sent for ${ids.length} bills.`);
   };
 
   return (
@@ -47,7 +54,11 @@ export default function PendingBillsPage() {
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
-          <KPI icon={FiCreditCard} label="Total Pending Bills" value={stats.total} />
+          <KPI
+            icon={FiCreditCard}
+            label="Total Pending Bills"
+            value={stats.total}
+          />
         </Card>
         <Card>
           <KPI
@@ -70,13 +81,23 @@ export default function PendingBillsPage() {
           ]}
           data={bills}
           loading={loading}
+          actions={(selected) =>
+            selected.length > 0 && (
+              <Button
+                variant="primary"
+                onClick={() => requestBulkClearance(selected)}
+              >
+                Request Selected ({selected.length})
+              </Button>
+            )
+          }
           rowActions={(row) => (
             <Button
               size="sm"
-              variant="primary"
+              variant="secondary"
               onClick={() => requestClearance(row.id)}
             >
-              Request Clearance
+              Request
             </Button>
           )}
         />

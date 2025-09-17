@@ -6,21 +6,21 @@ import Sidebar from "../components/shared/Sidebar";
 import Topbar from "../components/shared/Topbar";
 import ProfileCard from "../components/shared/ProfileCard";
 
-const DashboardLayout = ({ role }) => {
+const DashboardLayout = () => {
   const { user } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <Sidebar role={role} />
+      {/* Sidebar - filter menus based on role */}
+      <Sidebar />
 
       {/* Main Content */}
       <div className="flex flex-col flex-1">
-        {/* Topbar (only profile now) */}
+        {/* Topbar */}
         <Topbar
           user={user}
-          role={role}
+          role={user?.role}
           onProfileClick={() => setShowProfile(true)}
         />
 

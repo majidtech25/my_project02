@@ -1,4 +1,3 @@
-// src/config/menuConfig.js
 import {
   FaTachometerAlt,
   FaUsers,
@@ -26,7 +25,11 @@ const menuConfig = {
     },
     { label: "Employees", path: "/employer/employees", icon: FaUsers },
     { label: "Products & Categories", path: "/employer/products", icon: FaBox },
-    { label: "Supplier & Payment", path: "/employer/suppliers", icon: FaTruck },
+    {
+      label: "Suppliers & Payments",
+      path: "/employer/suppliers",
+      icon: FaTruck,
+    },
     { label: "Reports", path: "/employer/reports", icon: FaFileAlt },
   ],
 
@@ -39,7 +42,11 @@ const menuConfig = {
     },
     { label: "Employees", path: "/manager/employees", icon: FaUsers },
     { label: "Products & Categories", path: "/manager/products", icon: FaBox },
-    { label: "Suppliers & payment", path: "/manager/suppliers", icon: FaTruck },
+    {
+      label: "Suppliers & Payments",
+      path: "/manager/suppliers",
+      icon: FaTruck,
+    },
     { label: "Day Control", path: "/manager/day-ops", icon: FaClipboardList },
     { label: "Reports", path: "/manager/reports", icon: FaFileAlt },
   ],
@@ -57,7 +64,7 @@ const menuConfig = {
       path: "/employee/sales-history",
       icon: FaHistory,
     },
-    { label: "My Profile", path: "/employee/profile", icon: FaUserEdit }, // optional, keep if you use it
+    { label: "Profile", path: "/employee/profile", icon: FaUserEdit }, // cleaner wording
   ],
 };
 

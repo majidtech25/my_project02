@@ -1,3 +1,4 @@
+// src/pages/manager/ManagerCreditManagementPage.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { getCreditSummary, markCreditCleared } from "../../services/api";
 import Card from "../../components/shared/Card";
@@ -18,12 +19,12 @@ export default function ManagerCreditManagementPage() {
     setLoading(true);
     try {
       const res = await getCreditSummary({ tab });
-      setRows(res.data || []);
+      setRows(res?.data || []);
 
       if (tab === "open") {
-        setStats((s) => ({ ...s, open: res.data.length }));
+        setStats((s) => ({ ...s, open: res?.data?.length || 0 }));
       } else {
-        setStats((s) => ({ ...s, cleared: res.data.length }));
+        setStats((s) => ({ ...s, cleared: res?.data?.length || 0 }));
       }
     } catch (err) {
       console.error("Error loading credits:", err);
@@ -37,21 +38,28 @@ export default function ManagerCreditManagementPage() {
     loadCredits();
   }, [loadCredits]);
 
-  // ✅ Approve credit
-  const handleApprove = async (id) => {
+  // ✅ Clear a single credit
+  const handleClear = async (id) => {
     try {
       await markCreditCleared(id);
-      toast.success("Credit approved and cleared.");
+      toast.success("Credit cleared successfully.");
       loadCredits();
     } catch (err) {
-      console.error("Error approving credit:", err);
-      toast.error("Failed to approve credit.");
+      console.error("Error clearing credit:", err);
+      toast.error("Failed to clear credit.");
     }
   };
 
-  // ✅ Reject credit (mock only)
-  const handleReject = (id) => {
-    toast.warn(`Credit ${id} rejected (demo only)`);
+  // ✅ Bulk clear credits
+  const handleBulkClear = async (ids) => {
+    try {
+      await Promise.all(ids.map((id) => markCreditCleared(id)));
+      toast.success(`Cleared ${ids.length} credit(s)`);
+      loadCredits();
+    } catch (err) {
+      console.error("Bulk clear error:", err);
+      toast.error("Failed to clear selected credits");
+    }
   };
 
   return (
@@ -79,7 +87,7 @@ export default function ManagerCreditManagementPage() {
             variant={tab === "open" ? "primary" : "secondary"}
             onClick={() => setTab("open")}
           >
-            Pending Credits
+            Open Credits
           </Button>
           <Button
             variant={tab === "cleared" ? "primary" : "secondary"}
@@ -100,25 +108,27 @@ export default function ManagerCreditManagementPage() {
           ].filter(Boolean)}
           data={rows}
           loading={loading}
+          actions={(selected) =>
+            tab === "open" &&
+            selected.length > 0 && (
+              <Button
+                variant="primary"
+                onClick={() => handleBulkClear(selected)}
+              >
+                Clear Selected ({selected.length})
+              </Button>
+            )
+          }
           rowActions={
             tab === "open"
               ? (row) => (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleApprove(row.id)}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleReject(row.id)}
-                    >
-                      Reject
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleClear(row.id)}
+                  >
+                    Clear
+                  </Button>
                 )
               : undefined
           }

@@ -4,8 +4,11 @@ from sqlalchemy.orm import Session
 from db import get_db
 from crud import employee as crud_employee
 from schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeOut
-from auth.dependencies import get_current_user, require_role
+from auth.dependencies import get_current_user, get_current_user_optional, require_role
+from auth.hashing import get_password_hash
+from pydantic import BaseModel
 import models
+from typing import Optional
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -41,32 +44,32 @@ def read_employee(
 def create_employee(
     employee: EmployeeCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: Optional[models.Employee] = Depends(get_current_user_optional)  # ✅ allows no token for bootstrap
 ):
     """
     Create a new employee.
-    - If no employees exist → force role = employer (bootstrap admin).
+    - If no employees exist → bootstrap employer (no auth required).
     - Otherwise → only Employer or Manager can create employees.
     """
     employees_exist = bool(crud_employee.get_employees(db, 0, 1))
 
     if not employees_exist:
-        # First ever user must be Employer
+        # Bootstrap employer → ignore auth
         if employee.role != models.EmployeeRole.employer:
             employee.role = models.EmployeeRole.employer
-        # Require password (no defaults in production)
         if not employee.password:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Password is required for the first employer account."
             )
-    else:
-        # Require Employer or Manager for further additions
-        if current_user.role.value not in ["employer", "manager"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only employer or manager can create employees."
-            )
+        return crud_employee.create_employee(db, employee)
+
+    # ✅ After bootstrap -> require Employer or Manager
+    if not current_user or current_user.role.value not in ["employer", "manager"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only employer or manager can create employees."
+        )
 
     return crud_employee.create_employee(db, employee)
 
@@ -85,7 +88,7 @@ def update_employee(
             status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found"
         )
 
-    # First employer cannot have role changed or be deactivated
+    # Protect first employer
     first_emp = db.query(models.Employee).order_by(models.Employee.id.asc()).first()
     if first_emp and first_emp.id == emp.id and emp.role.value == "employer":
         if employee.role and employee.role != "employer":
@@ -125,3 +128,24 @@ def delete_employee(
 
     crud_employee.delete_employee(db, employee_id)
     return {"ok": True}
+
+
+# ===== CHANGE OWN PASSWORD =====
+class PasswordChangeRequest(BaseModel):
+    new_password: str
+
+@router.put("/me/password")
+def change_own_password(
+    req: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if not req.new_password or len(req.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters."
+        )
+
+    current_user.hashed_password = get_password_hash(req.new_password)
+    db.commit()
+    return {"msg": "Password updated successfully"}

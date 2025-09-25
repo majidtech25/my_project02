@@ -13,7 +13,7 @@ from auth.schemas import Token
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-# ---------- For OAuth2PasswordRequestForm (Frontend compatibility) ----------
+# ---------- OAuth2PasswordRequestForm ----------
 @router.post("/login", response_model=Token)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -21,14 +21,14 @@ def login(
 ):
     """
     Login using OAuth2PasswordRequestForm.
-    - Username field maps to employee.phone.
+    - Username field maps to employee.name
     """
-    user = db.query(models.Employee).filter(models.Employee.phone == form_data.username).first()
+    user = db.query(models.Employee).filter(models.Employee.name == form_data.username).first()
 
     if not user or not verify_password(form_data.password, user.password_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid phone or password",
+            detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -42,9 +42,9 @@ def login(
     return {"access_token": token, "token_type": "bearer"}
 
 
-# ---------- For JSON Body Login (Swagger/Postman friendly) ----------
+# ---------- JSON Login ----------
 class LoginJSON(BaseModel):
-    phone: str
+    username: str
     password: str
 
 
@@ -52,14 +52,14 @@ class LoginJSON(BaseModel):
 def login_json(data: LoginJSON, db: Session = Depends(get_db)):
     """
     Login using JSON body.
-    - Accepts phone & password.
+    - Accepts name as username + password.
     """
-    user = db.query(models.Employee).filter(models.Employee.phone == data.phone).first()
+    user = db.query(models.Employee).filter(models.Employee.name == data.username).first()
 
     if not user or not verify_password(data.password, user.password_hash or ""):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid phone or password",
+            detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

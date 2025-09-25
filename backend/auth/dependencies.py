@@ -1,8 +1,8 @@
 # backend/auth/dependencies.py
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 import models
 from db import get_db
@@ -12,7 +12,7 @@ from auth.jwt_handler import decode_access_token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-# ===== Get Current User =====
+# ===== Strict: Require a valid token =====
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
@@ -51,6 +51,29 @@ def get_current_user(
         )
 
     return user
+
+
+# ===== Optional: Return None if no/invalid token =====
+def get_current_user_optional(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Optional[models.Employee]:
+    """
+    Return user if token is valid, else None (used for bootstrap employer).
+    Unlike get_current_user, this does NOT force 401 when missing.
+    """
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header.split(" ", 1)[1]
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload.get("sub"))
+    except Exception:
+        return None
+
+    return db.query(models.Employee).filter(models.Employee.id == user_id).first()
 
 
 # ===== Require Role =====

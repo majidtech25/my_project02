@@ -2,6 +2,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Import DB and models
+from db import Base, engine
+import models  # ensure models are imported so tables are registered
+
 # Import routes
 from routes import (
     employees,
@@ -25,9 +29,9 @@ app = FastAPI(
         "daily operations, and reporting."
     ),
     version="1.0.0",
-    openapi_url="/api/v1/openapi.json",  # versioned docs
-    docs_url="/api/v1/docs",             # Swagger UI
-    redoc_url="/api/v1/redoc",           # ReDoc UI
+    openapi_url="/api/v1/openapi.json",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
 )
 
 
@@ -42,6 +46,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ===== Database Init =====
+@app.on_event("startup")
+def on_startup():
+    """Create database tables if they don't exist."""
+    Base.metadata.create_all(bind=engine)
 
 
 # ===== Register Routers =====
@@ -68,4 +79,3 @@ def root():
         "redoc_url": "/api/v1/redoc",
         "version": "1.0.0",
     }
-

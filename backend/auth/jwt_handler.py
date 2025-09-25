@@ -1,24 +1,23 @@
-# backend/auth/jwt_handler.py
-from datetime import datetime, timedelta
-from jose import JWTError, ExpiredSignatureError, jwt
 import os
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from dotenv import load_dotenv
 
-# ===== Config =====
+# Load .env file if it exists
+load_dotenv()
+
+# ===== JWT CONFIG =====
 SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY environment variable must be set for JWT.")
+    raise RuntimeError(
+        "❌ SECRET_KEY not set. Please add it to your environment or backend/.env"
+    )
 
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
-
-
-# ===== Create Token =====
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
-    """
-    Create a JWT access token.
-    - `data` must contain at least {"sub": user_id}
-    - Default expiry = 60 minutes unless overridden
-    """
+# ===== CREATE TOKEN =====
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -26,16 +25,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-
-# ===== Decode Token =====
-def decode_access_token(token: str) -> dict | None:
-    """
-    Decode and verify a JWT access token.
-    Returns payload dict if valid, None if invalid/expired.
-    """
+# ===== DECODE TOKEN =====
+def decode_access_token(token: str):
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except ExpiredSignatureError:
-        return None  # Expired
-    except JWTError:
-        return None  # Invalid
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError as e:
+        raise ValueError(f"Invalid token: {str(e)}")

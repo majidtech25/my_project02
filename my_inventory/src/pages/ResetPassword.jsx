@@ -1,7 +1,6 @@
 // src/pages/ResetPassword.jsx
 import React, { useState } from "react";
 import { changePassword } from "../services/api";
-import jwtDecode from "jwt-decode";
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
@@ -18,11 +17,7 @@ export default function ResetPassword() {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const decoded = jwtDecode(token);
-      const userId = decoded.sub; // backend puts "sub" = user.id in JWT
-
-      await changePassword(userId, newPassword);
+      await changePassword(newPassword); // ✅ no userId needed, backend uses token
       setMessage("✅ Password changed successfully.");
     } catch (err) {
       setMessage("❌ Failed to update password: " + err.message);

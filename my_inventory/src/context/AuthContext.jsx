@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginApi, logoutApi } from "../services/api";
-import { jwtDecode } from "jwt-decode"; // ✅ correct import for v4
+import  jwtDecode  from "jwt-decode"; // ✅ correct import for v4
 
 const AuthContext = createContext();
 
@@ -27,9 +27,9 @@ export const AuthProvider = ({ children }) => {
   });
 
   // ===== Login =====
-  const login = async (phone, password) => {
+  const login = async (username, password) => {
     try {
-      const data = await loginApi(phone, password);
+      const data = await loginApi(username, password); // ✅ now username instead of phone
       if (data?.access_token) {
         const decoded = jwtDecode(data.access_token);
         const loggedUser = {

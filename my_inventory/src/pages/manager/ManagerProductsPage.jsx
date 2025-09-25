@@ -9,6 +9,15 @@ import ModalCard from "../../components/shared/ModalCard";
 import { toast } from "react-toastify";
 import { FiBox, FiAlertTriangle } from "react-icons/fi";
 
+const EMPTY_PRODUCT_FORM = {
+  name: "",
+  sku: "",
+  price: "",
+  stock: "",
+  category_id: "",
+  supplier_id: "",
+};
+
 export default function ManagerProductsPage() {
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
@@ -16,14 +25,7 @@ export default function ManagerProductsPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    sku: "",
-    category: "",
-    price: "",
-    stock: "",
-    image: "",
-  });
+  const [form, setForm] = useState({ ...EMPTY_PRODUCT_FORM });
 
   // ✅ Load products
   const loadProducts = useCallback(async () => {
@@ -50,32 +52,36 @@ export default function ManagerProductsPage() {
 
   // ✅ Handle input
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    if (name === "image" && files.length > 0) {
-      const file = files[0];
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setForm((prev) => ({ ...prev, image: reader.result })); // store as base64
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   // ✅ Save product
   const handleSave = async () => {
     try {
+      const payload = {
+        name: form.name?.trim(),
+        sku: form.sku?.trim(),
+        price: form.price ? Number(form.price) : undefined,
+        stock: form.stock ? Number(form.stock) : undefined,
+        category_id: form.category_id
+          ? Number(form.category_id)
+          : undefined,
+        supplier_id: form.supplier_id
+          ? Number(form.supplier_id)
+          : undefined,
+      };
+
       if (editing) {
-        await updateProduct(editing.id, form);
+        await updateProduct(editing.id, payload);
         toast.success("Product updated successfully!");
       } else {
-        await createProduct(form);
+        await createProduct(payload);
         toast.success("Product added successfully!");
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: "", sku: "", category: "", price: "", stock: "", image: "" });
+      setForm({ ...EMPTY_PRODUCT_FORM });
       loadProducts();
     } catch (err) {
       console.error("Error saving product:", err);
@@ -97,26 +103,30 @@ export default function ManagerProductsPage() {
       <Card>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Product List</h2>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setEditing(null);
+              setForm({ ...EMPTY_PRODUCT_FORM });
+              setShowForm(true);
+            }}
+          >
             Add Product
           </Button>
         </div>
 
         <DataTable
           columns={[
-            {
-              key: "image",
-              label: "Image",
-              render: (row) =>
-                row.image ? (
-                  <img src={row.image} alt={row.name} className="h-8 w-8 rounded object-cover" />
-                ) : (
-                  "—"
-                ),
-            },
             { key: "name", label: "Name", sortable: true },
             { key: "sku", label: "SKU" },
-            { key: "category", label: "Category" },
+            {
+              key: "category_id",
+              label: "Category",
+              render: (row) =>
+                typeof row.category_id === "number"
+                  ? `Category #${row.category_id}`
+                  : "Unassigned",
+            },
             { key: "price", label: "Price (KES)", sortable: true },
             {
               key: "stock",
@@ -144,10 +154,16 @@ export default function ManagerProductsPage() {
                 setForm({
                   name: row.name,
                   sku: row.sku,
-                  category: row.category,
                   price: row.price,
                   stock: row.stock,
-                  image: row.image || "",
+                  category_id:
+                    typeof row.category_id === "number"
+                      ? String(row.category_id)
+                      : "",
+                  supplier_id:
+                    typeof row.supplier_id === "number"
+                      ? String(row.supplier_id)
+                      : "",
                 });
                 setShowForm(true);
               }}
@@ -186,11 +202,21 @@ export default function ManagerProductsPage() {
               />
             </div>
             <div className="flex justify-between">
-              <span className="font-medium">Category:</span>
+              <span className="font-medium">Category ID:</span>
               <input
-                type="text"
-                name="category"
-                value={form.category}
+                type="number"
+                name="category_id"
+                value={form.category_id}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-40 text-sm"
+              />
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium">Supplier ID:</span>
+              <input
+                type="number"
+                name="supplier_id"
+                value={form.supplier_id}
                 onChange={handleChange}
                 className="border rounded px-2 py-1 w-40 text-sm"
               />
@@ -215,17 +241,6 @@ export default function ManagerProductsPage() {
                 className="border rounded px-2 py-1 w-40 text-sm"
               />
             </div>
-            <div className="flex justify-between">
-              <span className="font-medium">Image:</span>
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                onChange={handleChange}
-                className="border rounded px-2 py-1 w-40 text-sm"
-              />
-            </div>
-
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="secondary" onClick={() => setShowForm(false)}>
                 Cancel

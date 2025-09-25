@@ -1,7 +1,6 @@
 # backend/schemas/product.py
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 from typing import Optional, Annotated
-from datetime import datetime
 
 # ====== TYPE ALIASES ======
 NameType = Annotated[str, StringConstraints(min_length=2, max_length=150)]
@@ -59,8 +58,6 @@ class ProductUpdate(BaseModel):
 # ====== OUT ======
 class ProductOut(ProductBase):
     id: int
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True

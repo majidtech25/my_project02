@@ -15,11 +15,14 @@ export default function ManagerDayOpsPage() {
 
   async function refresh() {
     setLoading(true);
-    const status = await getDayStatus();
-    const hist = await getDayHistory();
-    setDayStatus(status);
-    setHistory(hist);
-    setLoading(false);
+    try {
+      const status = await getDayStatus();
+      const hist = await getDayHistory();
+      setDayStatus(status);
+      setHistory(Array.isArray(hist) ? hist : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -81,28 +84,24 @@ export default function ManagerDayOpsPage() {
         <DataTable
           loading={loading}
           columns={[
-            "Date",
-            "Status",
-            "Sales",
-            "Credit Open",
-            "Credit Cleared",
-            "Paid",
+            { key: "date", label: "Date" },
+            { key: "status", label: "Status" },
+            { key: "opened_by", label: "Opened By" },
+            { key: "closed_by", label: "Closed By" },
           ]}
-          data={
-            Array.isArray(history)
-            ? history.map((d) => ({
-              key: d.date, 
-              values: [
-                d.data,
-                d.isOpen ? "open" : "closed",
-                'ksh ${d.sales}',
-                'Ksh ${d.credit0pen}',
-                'Ksh ${d.creditCleared}',
-                'Ksh ${d.paid}',
-              ]
-            }))
-            :[]
-          }
+          data={Array.isArray(history)
+            ? history.map((day) => ({
+                id: day.id,
+                date: day.date ?? "—",
+                status: day.is_open ? "Open" : "Closed",
+                opened_by: day.opened_by_id
+                  ? `Employee #${day.opened_by_id}`
+                  : "—",
+                closed_by: day.closed_by_id
+                  ? `Employee #${day.closed_by_id}`
+                  : "—",
+              }))
+            : []}
         />
       </Card>
     </div>

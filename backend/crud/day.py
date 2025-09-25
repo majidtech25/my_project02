@@ -1,6 +1,6 @@
 # backend/crud/day.py
 from sqlalchemy.orm import Session
-from datetime import date, datetime
+from datetime import date
 import models
 
 
@@ -37,7 +37,7 @@ def open_day(db: Session, employee_id: int) -> models.Day:
 
     # Ensure no open day already exists for today
     existing_open = db.query(models.Day).filter(
-        models.Day.date == today, models.Day.is_open == 1
+        models.Day.date == today, models.Day.is_open == True  # noqa: E712
     ).first()
     if existing_open:
         raise ValueError("Day is already open")
@@ -51,10 +51,8 @@ def open_day(db: Session, employee_id: int) -> models.Day:
 
     db_day = models.Day(
         date=today,
-        is_open=1,
+        is_open=True,
         opened_by_id=employee.id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
     )
     db.add(db_day)
     db.commit()
@@ -66,7 +64,7 @@ def close_day(db: Session, employee_id: int) -> models.Day:
     """Close the currently open business day."""
     today = get_today()
     db_day = db.query(models.Day).filter(
-        models.Day.date == today, models.Day.is_open == 1
+        models.Day.date == today, models.Day.is_open == True  # noqa: E712
     ).first()
     if not db_day:
         raise ValueError("No open day to close")
@@ -83,9 +81,8 @@ def close_day(db: Session, employee_id: int) -> models.Day:
     if credits:
         raise ValueError("Cannot close day with uncleared credits")
 
-    db_day.is_open = 0
+    db_day.is_open = False
     db_day.closed_by_id = employee.id
-    db_day.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_day)
     return db_day

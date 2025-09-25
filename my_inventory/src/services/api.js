@@ -38,12 +38,17 @@ async function apiFetch(endpoint, options = {}) {
       throw new Error("Unauthorized, please login again");
     }
 
+    if (res.status === 204) {
+      return null;
+    }
+
     if (!res.ok) {
       const errMsg = await res.text();
       throw new Error(`API error: ${res.status} - ${errMsg}`);
     }
 
-    return await res.json();
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   } catch (err) {
     console.warn(
       "API request failed, falling back to mock:",
@@ -81,21 +86,10 @@ export async function loginApi(username, password) {
 /* ================== EMPLOYEES ================== */
 export async function getEmployees({ skip = 0, limit = 10 } = {}) {
   const res = await apiFetch(`/employees?skip=${skip}&limit=${limit}`);
-  if (res) return res;
-
-  // Mock fallback
-  await new Promise((r) => setTimeout(r, 250));
+  const data = Array.isArray(res) ? res : [];
   return {
-    data: [
-      {
-        id: 1,
-        name: "Deno Employer",
-        role: "employer",
-        phone: "0712000111",
-        status: "active",
-      },
-    ],
-    total: 1,
+    data,
+    total: data.length,
   };
 }
 
@@ -122,8 +116,13 @@ export async function changePassword(newPassword) {
 }
 
 /* ================== PRODUCTS ================== */
-export async function getProducts({ category = "all", search = "" } = {}) {
-  return await apiFetch(`/products?category=${category}&search=${search}`);
+export async function getProducts({ skip = 0, limit = 100 } = {}) {
+  const res = await apiFetch(`/products?skip=${skip}&limit=${limit}`);
+  const data = Array.isArray(res) ? res : [];
+  return {
+    data,
+    total: data.length,
+  };
 }
 
 export async function createProduct(payload) {
@@ -145,8 +144,13 @@ export async function getCategories() {
 }
 
 /* ================== SUPPLIERS ================== */
-export async function getSuppliers({ search = "" } = {}) {
-  return await apiFetch(`/suppliers?search=${search}`);
+export async function getSuppliers({ skip = 0, limit = 100 } = {}) {
+  const res = await apiFetch(`/suppliers?skip=${skip}&limit=${limit}`);
+  const data = Array.isArray(res) ? res : [];
+  return {
+    data,
+    total: data.length,
+  };
 }
 
 export async function createSupplier(payload) {
@@ -165,19 +169,62 @@ export async function updateSupplier(id, payload) {
 
 /* ================== SALES ================== */
 export async function createSale(order) {
+  const payload = {
+    employee_id: order.employee_id,
+    items: Array.isArray(order.items)
+      ? order.items
+          .map((item) => ({
+            product_id:
+              item.product_id ?? item.productId ?? item.id ?? item.product,
+            quantity: item.quantity ?? item.qty ?? 1,
+          }))
+          .map((item) => ({
+            product_id: item.product_id ? Number(item.product_id) : undefined,
+            quantity: Number(item.quantity) || 1,
+          }))
+          .filter((item) => Number.isFinite(item.product_id))
+      : [],
+    is_credit: Boolean(order.is_credit),
+  };
+
   return await apiFetch("/sales", {
     method: "POST",
-    body: JSON.stringify(order),
+    body: JSON.stringify(payload),
   });
 }
 
 /* ================== CREDITS ================== */
-export async function getCreditSummary({ tab = "open", search = "" } = {}) {
-  return await apiFetch(`/credits?tab=${tab}&search=${search}`);
+export async function getCreditSummary({ tab = "open" } = {}) {
+  const res = await apiFetch(`/credits?skip=0&limit=500`);
+  const list = Array.isArray(res) ? res : [];
+  const normalizedTab = tab === "cleared" ? "cleared" : "open";
+  const rows = list
+    .filter((credit) =>
+      normalizedTab === "cleared"
+        ? credit.status === "cleared"
+        : credit.status !== "cleared"
+    )
+    .map((credit) => ({
+      id: credit.id,
+      customer: `Sale #${credit.sale_id}`,
+      amount: credit.amount,
+      date: credit.created_at,
+      staff: credit.employee_id ? `Employee #${credit.employee_id}` : "—",
+      clearedOn: credit.updated_at,
+      status: credit.status,
+    }));
+
+  return {
+    data: rows,
+    total: rows.length,
+  };
 }
 
 export async function markCreditCleared(id) {
-  return await apiFetch(`/credits/${id}/clear`, { method: "POST" });
+  return await apiFetch(`/credits/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ status: "cleared" }),
+  });
 }
 
 export async function clearPendingBill(id) {
@@ -188,7 +235,16 @@ export { getCreditSummary as getCreditsSummary };
 
 /* ================== REPORTS ================== */
 export async function getReports({ from, to } = {}) {
-  return await apiFetch(`/reports?from=${from}&to=${to}`);
+  if (from && to) {
+    return await apiFetch(
+      `/reports/period?start_date=${encodeURIComponent(from)}&end_date=${encodeURIComponent(
+        to
+      )}`
+    );
+  }
+
+  const dateParam = from ? `?report_date=${encodeURIComponent(from)}` : "";
+  return await apiFetch(`/reports/daily${dateParam}`);
 }
 
 /* ================== SALES OVERVIEW (Employer) ================== */
@@ -198,7 +254,30 @@ export async function getSalesOverview() {
 
 /* ================== DAY CONTROL ================== */
 export async function getDayStatus() {
-  return await apiFetch("/days/status");
+  const res = await apiFetch("/days?skip=0&limit=30");
+  if (!Array.isArray(res) || res.length === 0) {
+    return null;
+  }
+
+  const sorted = [...res].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+  const openDay = sorted.find((day) => day.is_open);
+
+  if (openDay) {
+    return {
+      id: openDay.id,
+      isOpen: true,
+      date: openDay.date,
+    };
+  }
+
+  const latest = sorted[0];
+  return {
+    id: latest?.id ?? null,
+    isOpen: false,
+    date: latest?.date ?? null,
+  };
 }
 
 export async function openSalesDay() {
@@ -210,10 +289,22 @@ export async function closeSalesDay() {
 }
 
 export async function getDayHistory() {
-  return await apiFetch("/days/history");
+  const res = await apiFetch("/days?skip=0&limit=30");
+  if (!Array.isArray(res)) {
+    return [];
+  }
+
+  return res
+    .map((day) => ({
+      id: day.id,
+      date: day.date,
+      is_open: day.is_open,
+      opened_by_id: day.opened_by_id,
+      closed_by_id: day.closed_by_id,
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 /* ================== AUTH HELPERS ================== */
 export function logoutApi() {
   clearToken();
 }
-

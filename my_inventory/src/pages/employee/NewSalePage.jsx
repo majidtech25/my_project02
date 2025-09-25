@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback } from "react";
 import Card from "../../components/shared/Card";
 import { getProducts, getCategories, createSale } from "../../services/api";
 import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
 
 export default function NewSalePage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState([]);
@@ -15,7 +17,7 @@ export default function NewSalePage() {
   const loadCategories = useCallback(async () => {
     try {
       const res = await getCategories();
-      setCategories(res);
+      setCategories(Array.isArray(res) ? res : []);
     } catch (err) {
       console.error("Error loading categories:", err);
       toast.error("Failed to load categories");
@@ -26,8 +28,26 @@ export default function NewSalePage() {
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getProducts({ category, search });
-      setProducts(res.data);
+      const res = await getProducts();
+      const data = Array.isArray(res?.data) ? res.data : [];
+
+      const filteredByCategory = (() => {
+        if (category === "all") return data;
+        const id = Number(category);
+        if (!Number.isFinite(id)) return data;
+        return data.filter((item) => item.category_id === id);
+      })();
+
+      const filtered = search
+        ? filteredByCategory.filter((item) => {
+            const name = item.name?.toLowerCase() ?? "";
+            const sku = item.sku?.toLowerCase() ?? "";
+            const query = search.toLowerCase();
+            return name.includes(query) || sku.includes(query);
+          })
+        : filteredByCategory;
+
+      setProducts(filtered);
     } catch (err) {
       console.error("Error loading products:", err);
       toast.error("Failed to load products");
@@ -40,6 +60,14 @@ export default function NewSalePage() {
     loadCategories();
     loadProducts();
   }, [loadCategories, loadProducts]);
+
+  const getCategoryName = useCallback(
+    (categoryId) => {
+      const match = categories.find((cat) => cat.id === categoryId);
+      return match?.name ?? "Unassigned";
+    },
+    [categories]
+  );
 
   // ✅ Add product to cart
   function addToCart(product) {
@@ -66,16 +94,22 @@ export default function NewSalePage() {
       return;
     }
     try {
+      if (!user?.id) {
+        toast.error("You need to be logged in to record a sale.");
+        return;
+      }
+
       await createSale({
+        employee_id: Number(user.id),
         items: cart.map((c) => ({
-          productId: c.id,
-          qty: c.qty,
-          price: c.price,
+          product_id: c.id,
+          quantity: c.qty,
         })),
-        total: cart.reduce((sum, c) => sum + c.price * c.qty, 0),
       });
+
       toast.success("Sale created successfully");
       setCart([]);
+      await loadProducts();
     } catch (err) {
       console.error("Error creating sale:", err);
       toast.error("Failed to create sale");
@@ -95,7 +129,7 @@ export default function NewSalePage() {
           >
             <option value="all">All Categories</option>
             {categories.map((cat) => (
-              <option key={cat.id} value={cat.name}>
+              <option key={cat.id} value={String(cat.id)}>
                 {cat.name}
               </option>
             ))}
@@ -128,7 +162,9 @@ export default function NewSalePage() {
                   className="w-20 h-20 object-cover mb-2"
                 />
                 <h3 className="text-sm font-semibold">{p.name}</h3>
-                <p className="text-xs text-gray-500">{p.category}</p>
+                <p className="text-xs text-gray-500">
+                  {getCategoryName(p.category_id)}
+                </p>
                 <p className="font-bold">KES {p.price}</p>
                 <p className="text-xs text-gray-400">Stock: {p.stock}</p>
               </Card>

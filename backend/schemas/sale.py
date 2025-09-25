@@ -1,7 +1,7 @@
 # backend/schemas/sale.py
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import date, datetime
+from datetime import date
 
 
 # ====== SALE ITEM ======
@@ -45,8 +45,6 @@ class SaleOut(SaleBase):
     date: date
     total_amount: float = Field(..., ge=0, description="Total amount of the sale")
     items: List[SaleItemOut]
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True

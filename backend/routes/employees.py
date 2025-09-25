@@ -146,6 +146,6 @@ def change_own_password(
             detail="Password must be at least 6 characters."
         )
 
-    current_user.hashed_password = get_password_hash(req.new_password)
+    current_user.password_hash = get_password_hash(req.new_password)
     db.commit()
     return {"msg": "Password updated successfully"}

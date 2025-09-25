@@ -91,7 +91,14 @@ export default function EmployerProductsPage() {
           columns={[
             { key: "name", label: "Name", sortable: true },
             { key: "sku", label: "SKU" },
-            { key: "category", label: "Category" },
+            {
+              key: "category_id",
+              label: "Category",
+              render: (row) => {
+                const match = categories.find((cat) => cat.id === row.category_id);
+                return match?.name || "Unassigned";
+              },
+            },
             { key: "price", label: "Price (KES)", sortable: true },
             {
               key: "stock",
@@ -109,7 +116,14 @@ export default function EmployerProductsPage() {
                 </span>
               ),
             },
-            { key: "supplier", label: "Supplier" },
+            {
+              key: "supplier_id",
+              label: "Supplier",
+              render: (row) =>
+                typeof row.supplier_id === "number"
+                  ? `Supplier #${row.supplier_id}`
+                  : "—",
+            },
           ]}
           data={products}
           loading={loading}

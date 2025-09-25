@@ -36,11 +36,14 @@ export default function EmployerDashboard() {
           getReports(),
         ]);
 
+      const employeeList = Array.isArray(employeesRes?.data)
+        ? employeesRes.data
+        : [];
+
       setStats({
         salesToday: salesRes.data?.total || 0,
         pendingCredits: creditsRes.data?.length || 0,
-        activeEmployees: employeesRes.data?.filter((e) => e.status === "active")
-          .length,
+        activeEmployees: employeeList.filter((e) => e.status === "active").length,
       });
 
       setRecentSales(salesRes.data?.recent || []);

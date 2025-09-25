@@ -20,26 +20,32 @@ export default function ManagerEmployeesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
+
+  const EMPTY_FORM = {
     name: "",
-    role: "",
+    role: "employee",
     phone: "",
     status: "active",
-  });
+    password: "",
+  };
+
+  const [form, setForm] = useState(EMPTY_FORM);
 
   // ✅ Fetch employees
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getEmployees();
-      const list = res.data || [];
+      const list = Array.isArray(res?.data) ? res.data : [];
       setEmployees(list);
 
       const activeCount = list.filter((e) => e.status === "active").length;
+      const totalCount =
+        typeof res?.total === "number" ? res.total : list.length;
       setStats({
-        total: res.total || list.length,
+        total: totalCount,
         active: activeCount,
-        inactive: (res.total || list.length) - activeCount,
+        inactive: totalCount - activeCount,
       });
     } catch (err) {
       console.error("Error loading employees:", err);
@@ -55,23 +61,46 @@ export default function ManagerEmployeesPage() {
 
   // ✅ Handle input change
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   // ✅ Save employee
   const handleSave = async (e) => {
     e.preventDefault(); // ⬅️ Prevent page reload
+    const payload = {
+      name: form.name.trim(),
+      role: form.role,
+      phone: form.phone.trim(),
+      status: form.status,
+    };
+
+    if (!payload.name || !payload.role || !payload.phone) {
+      toast.error("Name, role, and phone are required.");
+      return;
+    }
+
+    if (!editing) {
+      if (!form.password || form.password.trim().length < 6) {
+        toast.error("Password must be at least 6 characters for new employees.");
+        return;
+      }
+      payload.password = form.password.trim();
+    } else if (form.password && form.password.trim().length > 0) {
+      payload.password = form.password.trim();
+    }
+
     try {
       if (editing) {
-        await updateEmployee(editing.id, form);
+        await updateEmployee(editing.id, payload);
         toast.success("Employee updated!");
       } else {
-        await createEmployee(form);
+        await createEmployee(payload);
         toast.success("Employee added!");
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: "", role: "", phone: "", status: "active" });
+      setForm(EMPTY_FORM);
       loadEmployees();
     } catch (err) {
       console.error("Error saving employee:", err);
@@ -100,7 +129,14 @@ export default function ManagerEmployeesPage() {
       <Card>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Employee List</h2>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setEditing(null);
+              setForm(EMPTY_FORM);
+              setShowForm(true);
+            }}
+          >
             Add Employee
           </Button>
         </div>
@@ -139,6 +175,7 @@ export default function ManagerEmployeesPage() {
                   role: row.role,
                   phone: row.phone,
                   status: row.status,
+                  password: "",
                 });
                 setShowForm(true);
               }}
@@ -167,12 +204,19 @@ export default function ManagerEmployeesPage() {
             </div>
             <div className="flex flex-col">
               <label className="text-sm font-medium">Role</label>
-              <input
+              <select
                 name="role"
                 value={form.role}
                 onChange={handleChange}
                 className="border rounded px-2 py-1 w-full text-sm"
-              />
+              >
+                <option value="" disabled>
+                  Select role
+                </option>
+                <option value="employer">Employer</option>
+                <option value="manager">Manager</option>
+                <option value="employee">Employee</option>
+              </select>
             </div>
             <div className="flex flex-col">
               <label className="text-sm font-medium">Phone</label>
@@ -181,6 +225,22 @@ export default function ManagerEmployeesPage() {
                 value={form.phone}
                 onChange={handleChange}
                 className="border rounded px-2 py-1 w-full text-sm"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium">Password</label>
+              <input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                className="border rounded px-2 py-1 w-full text-sm"
+                placeholder={
+                  editing
+                    ? "New Password (optional)"
+                    : "Password (required)"
+                }
+                autoComplete="new-password"
               />
             </div>
             <div className="flex flex-col">

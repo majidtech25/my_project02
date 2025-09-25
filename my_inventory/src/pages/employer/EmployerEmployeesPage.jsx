@@ -19,24 +19,33 @@ export default function EmployerEmployeesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
+
+  const EMPTY_FORM = {
     name: "",
-    role: "",
+    role: "employee",
     phone: "",
     status: "active",
-  });
+    password: "",
+  };
+
+  const [form, setForm] = useState(EMPTY_FORM);
 
   // ✅ Load employees
   const loadEmployees = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getEmployees();
-      setEmployees(res.data || []);
-      const activeCount = res.data.filter((e) => e.status === "active").length;
+      const employeeList = Array.isArray(res?.data) ? res.data : [];
+      setEmployees(employeeList);
+
+      const activeCount = employeeList.filter((e) => e.status === "active").length;
+      const totalCount =
+        typeof res?.total === "number" ? res.total : employeeList.length;
+
       setStats({
-        total: res.total || res.data.length,
+        total: totalCount,
         active: activeCount,
-        inactive: (res.total || res.data.length) - activeCount,
+        inactive: totalCount - activeCount,
       });
     } catch (err) {
       console.error("Error loading employees:", err);
@@ -52,22 +61,45 @@ export default function EmployerEmployeesPage() {
 
   // ✅ Handle input change
   const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   // ✅ Save employee (Employer also allowed)
   const handleSave = async () => {
+    const payload = {
+      name: form.name.trim(),
+      role: form.role,
+      phone: form.phone.trim(),
+      status: form.status,
+    };
+
+    if (!payload.name || !payload.role || !payload.phone) {
+      toast.error("Name, role, and phone are required.");
+      return;
+    }
+
+    if (!editing) {
+      if (!form.password || form.password.trim().length < 6) {
+        toast.error("Password must be at least 6 characters for new employees.");
+        return;
+      }
+      payload.password = form.password.trim();
+    } else if (form.password && form.password.trim().length > 0) {
+      payload.password = form.password.trim();
+    }
+
     try {
       if (editing) {
-        await updateEmployee(editing.id, form);
+        await updateEmployee(editing.id, payload);
         toast.success("Employee updated!");
       } else {
-        await createEmployee(form);
+        await createEmployee(payload);
         toast.success("Employee added!");
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: "", role: "", phone: "", status: "active" });
+      setForm(EMPTY_FORM);
       loadEmployees();
     } catch (err) {
       console.error("Error saving employee:", err);
@@ -104,7 +136,14 @@ export default function EmployerEmployeesPage() {
       <Card>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Employee List</h2>
-          <Button variant="primary" onClick={() => setShowForm(true)}>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setEditing(null);
+              setForm(EMPTY_FORM);
+              setShowForm(true);
+            }}
+          >
             Add Employee
           </Button>
         </div>
@@ -143,6 +182,7 @@ export default function EmployerEmployeesPage() {
                   role: row.role,
                   phone: row.phone,
                   status: row.status,
+                  password: "",
                 });
                 setShowForm(true);
               }}
@@ -167,19 +207,38 @@ export default function EmployerEmployeesPage() {
               placeholder="Full Name"
               className="w-full border rounded px-3 py-2"
             />
-            <input
+            <select
               name="role"
               value={form.role}
               onChange={handleChange}
-              placeholder="Role"
               className="w-full border rounded px-3 py-2"
-            />
+            >
+              <option value="" disabled>
+                Select role
+              </option>
+              <option value="employer">Employer</option>
+              <option value="manager">Manager</option>
+              <option value="employee">Employee</option>
+            </select>
             <input
               name="phone"
               value={form.phone}
               onChange={handleChange}
               placeholder="Phone"
               className="w-full border rounded px-3 py-2"
+            />
+            <input
+              name="password"
+              type="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder={
+                editing
+                  ? "New Password (optional)"
+                  : "Password (required for new employee)"
+              }
+              className="w-full border rounded px-3 py-2"
+              autoComplete="new-password"
             />
             <select
               name="status"

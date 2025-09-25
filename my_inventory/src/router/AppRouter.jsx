@@ -1,12 +1,9 @@
 // src/router/AppRouter.jsx
 import React from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import jwtDecode from "jwt-decode";
+
+import DashboardLayout from "../layouts/DashboardLayout";
 
 // ===== Pages =====
 import Login from "../pages/Login";
@@ -64,7 +61,6 @@ function ProtectedRoute({ children, allowedRoles }) {
 // ===== Main Router =====
 export default function AppRouter() {
   return (
-    <Router>
       <Routes>
         {/* Auth */}
         <Route path="/login" element={<Login />} />
@@ -72,167 +68,63 @@ export default function AppRouter() {
 
         {/* Employer Routes */}
         <Route
-          path="/employer/dashboard"
+          path="/employer"
           element={
             <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerDashboard />
+              <DashboardLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/employer/sales-overview"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerSalesOverviewPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employer/credit"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerCreditManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employer/employees"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerEmployeesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employer/products"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerProductsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employer/suppliers"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerSuppliersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employer/reports"
-          element={
-            <ProtectedRoute allowedRoles={["employer"]}>
-              <EmployerReportsPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<EmployerDashboard />} />
+          <Route path="sales-overview" element={<EmployerSalesOverviewPage />} />
+          <Route path="credit" element={<EmployerCreditManagementPage />} />
+          <Route path="employees" element={<EmployerEmployeesPage />} />
+          <Route path="products" element={<EmployerProductsPage />} />
+          <Route path="suppliers" element={<EmployerSuppliersPage />} />
+          <Route path="reports" element={<EmployerReportsPage />} />
+        </Route>
 
         {/* Manager Routes */}
         <Route
-          path="/manager/dashboard"
+          path="/manager"
           element={
             <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerDashboard />
+              <DashboardLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/manager/credit"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerCreditManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/day-ops"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerDayOpsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/employees"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerEmployeesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/products"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerProductsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/suppliers"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerSuppliersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/reports"
-          element={
-            <ProtectedRoute allowedRoles={["manager"]}>
-              <ManagerReportsPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<ManagerDashboard />} />
+          <Route path="credit" element={<ManagerCreditManagementPage />} />
+          <Route path="day-ops" element={<ManagerDayOpsPage />} />
+          <Route path="employees" element={<ManagerEmployeesPage />} />
+          <Route path="products" element={<ManagerProductsPage />} />
+          <Route path="suppliers" element={<ManagerSuppliersPage />} />
+          <Route path="reports" element={<ManagerReportsPage />} />
+        </Route>
 
         {/* Employee Routes */}
         <Route
-          path="/employee/dashboard"
+          path="/employee"
           element={
             <ProtectedRoute allowedRoles={["employee"]}>
-              <EmployeeDashboard />
+              <DashboardLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/employee/profile"
-          element={
-            <ProtectedRoute allowedRoles={["employee"]}>
-              <EmployeeProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee/new-sale"
-          element={
-            <ProtectedRoute allowedRoles={["employee"]}>
-              <NewSalesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee/pending-bills"
-          element={
-            <ProtectedRoute allowedRoles={["employee"]}>
-              <PendingBillsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee/sales-history"
-          element={
-            <ProtectedRoute allowedRoles={["employee"]}>
-              <SalesHistoryPage />
-            </ProtectedRoute>
-          }
-        />
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<EmployeeDashboard />} />
+          <Route path="profile" element={<EmployeeProfilePage />} />
+          <Route path="new-sale" element={<NewSalesPage />} />
+          <Route path="pending-bills" element={<PendingBillsPage />} />
+          <Route path="sales-history" element={<SalesHistoryPage />} />
+        </Route>
         {/*Reset Password*/}
         <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Default Redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-    </Router>
   );
 }

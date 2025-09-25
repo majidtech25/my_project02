@@ -1,12 +1,12 @@
 # backend/schemas/day.py
 from pydantic import BaseModel, Field
-from datetime import date
+from datetime import date as dt_date
 from typing import Optional
 
 
 # ===== BASE =====
 class DayBase(BaseModel):
-    date: date = Field(..., description="Business day date")
+    date: dt_date = Field(..., description="Business day date")
 
 
 # ===== CREATE =====
@@ -24,7 +24,7 @@ class DayUpdate(BaseModel):
 # ===== OUT =====
 class DayOut(BaseModel):
     id: int
-    date: date
+    date: dt_date
     is_open: bool
     opened_by_id: Optional[int]
     closed_by_id: Optional[int]

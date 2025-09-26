@@ -22,8 +22,36 @@ export default function EmployerReportsPage() {
     setLoading(true);
     try {
       const res = await getReports(filters);
-      setStats(res.totals || {});
-      setRows(res.byDay || []);
+
+      if (!res) {
+        setStats({ sales: 0, creditOpen: 0, creditCleared: 0 });
+        setRows([]);
+        return;
+      }
+
+      const summary = res.sales_summary || {};
+      const creditSummary = res.credit_summary || {};
+
+      setStats({
+        sales: summary.total_sales || 0,
+        creditOpen: creditSummary.open_credits || 0,
+        creditCleared: creditSummary.cleared_credits || 0,
+      });
+
+      const tableRows = [];
+
+      if (res.day_report) {
+        const day = res.day_report;
+        tableRows.push({
+          id: day.date,
+          date: day.date,
+          sales: summary.total_sales || 0,
+          creditOpen: creditSummary.open_credits || 0,
+          creditCleared: creditSummary.cleared_credits || 0,
+        });
+      }
+
+      setRows(tableRows);
     } catch (err) {
       console.error("Error loading reports:", err);
       toast.error("Failed to load reports.");

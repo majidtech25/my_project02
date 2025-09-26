@@ -60,13 +60,21 @@ export default function DataTable({
     }
   };
 
+  const renderActions = () => {
+    if (!actions) return null;
+    if (typeof actions === "function") {
+      return actions(selected);
+    }
+    return actions;
+  };
+
   return (
     <div className="space-y-4">
       {/* Title */}
       {title && <h2 className="text-lg font-semibold">{title}</h2>}
 
       {/* Global Actions */}
-      {actions && <div className="mb-2">{actions(selected)}</div>}
+      {actions && <div className="mb-2">{renderActions()}</div>}
 
       {/* Table */}
       <table className="min-w-full text-sm border rounded overflow-hidden">

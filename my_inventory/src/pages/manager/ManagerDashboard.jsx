@@ -1,6 +1,6 @@
 // src/pages/manager/ManagerDashboard.jsx
 import React, { useEffect, useState, useCallback } from "react";
-import { getReports, getCreditSummary } from "../../services/api";
+import { getReports, getCreditSummary, getSuppliers } from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import Button from "../../components/shared/Button";
@@ -21,18 +21,37 @@ export default function ManagerDashboard() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportsRes, creditsRes] = await Promise.all([
+      const [reportsRes, creditsRes, suppliersRes] = await Promise.all([
         getReports(),
         getCreditSummary({ tab: "open" }),
+        getSuppliers(),
       ]);
 
+      const summary = reportsRes?.sales_summary || {};
+      const creditSummary = reportsRes?.credit_summary || {};
+
+      const supplierList = Array.isArray(suppliersRes?.data)
+        ? suppliersRes.data
+        : [];
+
       setStats({
-        salesToday: reportsRes?.totals?.sales || 0,
+        salesToday: summary.total_sales || 0,
         credits: creditsRes?.data?.length || 0,
-        suppliers: 5, // 🔹 mock number until backend supplies supplier count
+        suppliers: supplierList.length,
       });
 
-      setRecent(reportsRes?.byDay?.slice(-5) || []);
+      const recentRows = [];
+      if (reportsRes?.day_report) {
+        recentRows.push({
+          id: reportsRes.day_report.date,
+          date: reportsRes.day_report.date,
+          sales: summary.total_sales || 0,
+          creditOpen: creditSummary.open_credits || 0,
+          creditCleared: creditSummary.cleared_credits || 0,
+        });
+      }
+
+      setRecent(recentRows);
     } catch (err) {
       console.error("Error loading dashboard:", err);
       toast.error("Failed to load manager dashboard.");

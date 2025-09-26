@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { FiX, FiUser } from "react-icons/fi";
 
@@ -9,9 +9,17 @@ export default function ProfileCard({ onClose }) {
   // Local form state
   const [form, setForm] = useState({
     name: user?.name || "",
-    email: user?.email || "",
+    phone: user?.phone || "",
     password: "",
   });
+
+  useEffect(() => {
+    setForm({
+      name: user?.name || "",
+      phone: user?.phone || "",
+      password: "",
+    });
+  }, [user, editing]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -57,8 +65,12 @@ export default function ProfileCard({ onClose }) {
               <span className="capitalize">{user?.role || "N/A"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="font-medium text-gray-600">Email:</span>
-              <span>{user?.email || "user@example.com"}</span>
+              <span className="font-medium text-gray-600">Phone:</span>
+              <span>{user?.phone || "N/A"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium text-gray-600">Status:</span>
+              <span className="capitalize">{user?.status || "N/A"}</span>
             </div>
           </div>
         ) : (
@@ -74,14 +86,12 @@ export default function ProfileCard({ onClose }) {
               />
             </div>
             <div>
-              <label className="block font-medium mb-1">Email</label>
+              <label className="block font-medium mb-1">Phone</label>
               <input
-                type="email"
-                name="email"
-                value={form.email}
+                name="phone"
+                value={form.phone}
                 onChange={handleChange}
                 className="border rounded-xl px-3 py-2 w-full"
-                required
               />
             </div>
             <div>

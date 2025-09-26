@@ -1,11 +1,6 @@
 // src/pages/employer/EmployerDashboard.jsx
 import React, { useEffect, useState, useCallback } from "react";
-import {
-  getReports,
-  getCreditsSummary,
-  getSalesOverview,
-  getEmployees,
-} from "../../services/api";
+import { getReports, getCreditsSummary, getEmployees } from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import DataTable from "../../components/shared/DataTable";
@@ -28,35 +23,34 @@ export default function EmployerDashboard() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [salesRes, creditsRes, employeesRes, reportsRes] =
-        await Promise.all([
-          getSalesOverview(),
-          getCreditsSummary({ tab: "open" }),
-          getEmployees(),
-          getReports(),
-        ]);
+      const [creditsRes, employeesRes, reportsRes] = await Promise.all([
+        getCreditsSummary({ tab: "open" }),
+        getEmployees(),
+        getReports(),
+      ]);
 
       const employeeList = Array.isArray(employeesRes?.data)
         ? employeesRes.data
         : [];
+      const activeEmployees = employeeList.filter(
+        (e) => `${e.status}`.trim().toLowerCase() === "active"
+      ).length;
+
+      const salesSummary = reportsRes?.sales_summary || {};
+      const creditSummary = reportsRes?.credit_summary || {};
+      const pendingCredits = creditSummary.open_credits ?? creditsRes?.data?.length ?? 0;
 
       setStats({
-        salesToday: salesRes.data?.total || 0,
-        pendingCredits: creditsRes.data?.length || 0,
-        activeEmployees: employeeList.filter((e) => e.status === "active").length,
+        salesToday: salesSummary.total_sales || 0,
+        pendingCredits,
+        activeEmployees,
       });
 
-      setRecentSales(salesRes.data?.recent || []);
+      setRecentSales([]);
 
-      // Example alerts (you can enhance this)
       const generatedAlerts = [];
-      if (reportsRes.data?.lowStock?.length > 0) {
-        generatedAlerts.push("Low stock on some products.");
-      }
-      if (reportsRes.data?.unclosedDays > 0) {
-        generatedAlerts.push(
-          `${reportsRes.data.unclosedDays} unclosed sales days pending approval`
-        );
+      if ((creditSummary.open_credits || 0) > 0) {
+        generatedAlerts.push("There are open credits awaiting clearance.");
       }
       setAlerts(generatedAlerts);
     } catch (err) {

@@ -25,12 +25,26 @@ export default function EmployeeDashboard() {
         getCreditSummary({ tab: "open" }),
       ]);
 
+      const salesSummary = reportsRes?.sales_summary || {};
+      const dayReport = reportsRes?.day_report;
+
       setStats({
-        salesToday: reportsRes?.totals?.sales || 0,
+        salesToday: salesSummary.total_sales || 0,
         pendingCredits: creditsRes?.data?.length || 0,
       });
 
-      setRecent(reportsRes?.byDay?.slice(-5) || []);
+      const tableRows = [];
+      if (dayReport) {
+        tableRows.push({
+          id: dayReport.date,
+          date: dayReport.date,
+          sales: salesSummary.total_sales || 0,
+          creditOpen: salesSummary.total_credits || 0,
+          creditCleared: salesSummary.total_cash || 0,
+        });
+      }
+
+      setRecent(tableRows);
     } catch (err) {
       console.error("Error loading employee dashboard:", err);
       toast.error("Failed to load employee dashboard.");

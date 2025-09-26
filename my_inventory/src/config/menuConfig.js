@@ -6,7 +6,6 @@ import {
   FaFileAlt,
   FaCashRegister,
   FaHistory,
-  FaUserEdit,
   FaTruck,
 } from "react-icons/fa";
 

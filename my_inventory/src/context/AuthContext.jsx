@@ -10,7 +10,15 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(() => {
-    // Restore user from localStorage if token exists
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch {
+        // fall through to token decode
+      }
+    }
+
     const token = localStorage.getItem("token");
     if (token) {
       try {
@@ -32,11 +40,17 @@ export const AuthProvider = ({ children }) => {
       const data = await loginApi(username, password); // ✅ now username instead of phone
       if (data?.access_token) {
         const decoded = jwtDecode(data.access_token);
+        const profile = data.user || {};
         const loggedUser = {
           id: decoded.sub,
-          role: decoded.role,
+          role: profile.role || decoded.role,
+          name: profile.name || username,
+          phone: profile.phone || "",
+          status: profile.status,
         };
+
         setUser(loggedUser);
+        localStorage.setItem("user", JSON.stringify(loggedUser));
 
         // Redirect to dashboard based on role
         navigate(`/${loggedUser.role}/dashboard`);
@@ -50,6 +64,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     logoutApi();
     setUser(null);
+    localStorage.removeItem("user");
     navigate("/login");
   };
 

@@ -90,17 +90,21 @@ export default function EmployerCreditManagementPage() {
           loading={loading}
           actions={
             tab === "open"
-              ? () =>
-                  rows.length === 0 ? null : (
-                    <Button
-                      variant="primary"
-                      onClick={() =>
-                        toast.info("Select a credit row to clear individually.")
-                      }
-                    >
-                      Clear Selected
-                    </Button>
-                  )
+              ? (selected) =>
+                  selected.length === 0
+                    ? null
+                    : (
+                        <Button
+                          variant="primary"
+                          onClick={() =>
+                            toast.info(
+                              "Bulk clearing will be available once backend support is added."
+                            )
+                          }
+                        >
+                          Clear Selected ({selected.length})
+                        </Button>
+                      )
               : null
           }
           rowActions={

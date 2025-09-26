@@ -39,7 +39,9 @@ export default function ManagerEmployeesPage() {
       const list = Array.isArray(res?.data) ? res.data : [];
       setEmployees(list);
 
-      const activeCount = list.filter((e) => e.status === "active").length;
+      const activeCount = list.filter(
+        (e) => `${e.status}`.trim().toLowerCase() === "active"
+      ).length;
       const totalCount =
         typeof res?.total === "number" ? res.total : list.length;
       setStats({

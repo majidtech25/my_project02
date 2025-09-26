@@ -2,12 +2,19 @@
 import React from "react";
 import { FiUser } from "react-icons/fi";
 
+function titleCase(value) {
+  if (!value) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export default function Topbar({ user, role, onProfileClick }) {
+  const displayRole = role || user?.role || "user";
+  const displayName = user?.name || user?.phone || "User";
   return (
     <header className="flex items-center justify-between bg-white shadow px-6 py-3 border-b border-gray-200">
       {/* Title */}
       <h1 className="text-lg font-semibold text-gray-800 capitalize">
-        {role} Dashboard
+        {titleCase(displayRole)} Dashboard
       </h1>
 
       {/* Right controls */}
@@ -19,7 +26,7 @@ export default function Topbar({ user, role, onProfileClick }) {
         >
           <FiUser />
           <span className="hidden md:inline text-sm">
-            {user?.name || "User"} ({role})
+            {displayName} ({titleCase(displayRole)})
           </span>
         </button>
       </div>

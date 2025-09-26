@@ -9,6 +9,7 @@ import models
 from auth.hashing import verify_password
 from auth.jwt_handler import create_access_token
 from auth.schemas import Token
+from schemas.employee import EmployeeOut
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -39,7 +40,11 @@ def login(
         )
 
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": EmployeeOut.model_validate(user),
+    }
 
 
 # ---------- JSON Login ----------
@@ -70,4 +75,8 @@ def login_json(data: LoginJSON, db: Session = Depends(get_db)):
         )
 
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": EmployeeOut.model_validate(user),
+    }

@@ -6,6 +6,7 @@ import {
   updateProduct,
   getCategories,
   getSuppliers,
+  createCategory,
 } from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
@@ -21,6 +22,7 @@ const EMPTY_PRODUCT_FORM = {
   price: "",
   stock: "",
   category_id: "",
+  category_name: "",
   supplier_id: "",
 };
 
@@ -47,7 +49,6 @@ export default function ManagerProductsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_PRODUCT_FORM });
 
-  // ✅ Load products
   const loadProducts = useCallback(async () => {
     setLoading(true);
     try {
@@ -56,7 +57,7 @@ export default function ManagerProductsPage() {
       setProducts(data);
       setStats({
         total: data.length,
-        lowStock: data.filter((p) => p.stock < 10).length,
+        lowStock: data.filter((p) => Number(p.stock) < 10).length,
       });
     } catch (err) {
       console.error("Error loading products:", err);
@@ -91,14 +92,29 @@ export default function ManagerProductsPage() {
   const categoryLookup = useMemo(() => {
     const map = new Map();
     categories.forEach((cat) => map.set(cat.id, cat.name));
+    products.forEach((prod) => {
+      if (prod.category?.id && prod.category?.name) {
+        map.set(prod.category.id, prod.category.name);
+      }
+    });
     return map;
-  }, [categories]);
+  }, [categories, products]);
 
   const supplierLookup = useMemo(() => {
     const map = new Map();
     suppliers.forEach((sup) => map.set(sup.id, sup.name));
+    products.forEach((prod) => {
+      if (prod.supplier?.id && prod.supplier?.name) {
+        map.set(prod.supplier.id, prod.supplier.name);
+      }
+    });
     return map;
-  }, [suppliers]);
+  }, [suppliers, products]);
+
+  const categoryOptions = useMemo(
+    () => Array.from(new Set(Array.from(categoryLookup.values()).filter(Boolean))).sort(),
+    [categoryLookup]
+  );
 
   const getCategoryName = useCallback(
     (categoryId) => categoryLookup.get(categoryId) || "Unassigned",
@@ -114,33 +130,24 @@ export default function ManagerProductsPage() {
     (productName) => {
       if (!productName) return "";
       const nameLower = productName.toLowerCase();
-      let bestMatch = "";
-      categories.forEach((cat) => {
-        const catName = String(cat.name || "").toLowerCase();
-        if (catName && nameLower.includes(catName)) {
-          bestMatch = String(cat.id);
-        } else {
-          const tokens = catName.split(/\s+/).filter((token) => token.length > 2);
-          if (
-            tokens.length &&
-            tokens.some((token) => token && nameLower.includes(token))
-          ) {
-            bestMatch = String(cat.id);
-          }
+      for (const [id, label] of categoryLookup.entries()) {
+        if (!label) continue;
+        const labelLower = label.toLowerCase();
+        if (nameLower.includes(labelLower)) {
+          return String(id);
         }
-      });
-      return bestMatch;
+      }
+      return "";
     },
-    [categories]
+    [categoryLookup]
   );
 
   const openCreateModal = () => {
     setEditing(null);
-    setForm({ ...EMPTY_PRODUCT_FORM, sku: "" });
+    setForm({ ...EMPTY_PRODUCT_FORM });
     setShowForm(true);
   };
 
-  // ✅ Handle input
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => {
@@ -151,18 +158,31 @@ export default function ManagerProductsPage() {
         };
         if (!editing) {
           nextState.sku = generateSku(value);
-        }
-        const suggested = suggestCategoryId(value);
-        if (!editing && suggested) {
-          nextState.category_id = suggested;
+          const suggested = suggestCategoryId(value);
+          if (suggested) {
+            nextState.category_id = suggested;
+            nextState.category_name = getCategoryName(Number(suggested));
+          }
         }
         return nextState;
+      }
+      if (name === "category_name") {
+        const match = categories.find(
+          (cat) => cat.name.toLowerCase() === value.toLowerCase()
+        );
+        return {
+          ...prev,
+          category_name: value,
+          category_id: match ? String(match.id) : "",
+        };
+      }
+      if (name === "supplier_id") {
+        return { ...prev, supplier_id: value };
       }
       return { ...prev, [name]: value };
     });
   };
 
-  // ✅ Save product
   const handleSave = async () => {
     const trimmedName = form.name.trim();
     if (!trimmedName) {
@@ -170,25 +190,51 @@ export default function ManagerProductsPage() {
       return;
     }
 
-    const priceValue = form.price === "" ? undefined : Number(form.price);
-    if (priceValue === undefined || Number.isNaN(priceValue) || priceValue < 0) {
+    const priceValue = Number(form.price);
+    if (Number.isNaN(priceValue) || priceValue < 0) {
       toast.error("Please enter a valid price.");
       return;
     }
 
-    const stockValue = form.stock === "" ? undefined : Number(form.stock);
-    if (stockValue === undefined || Number.isNaN(stockValue) || stockValue < 0) {
+    const stockValue = Number(form.stock);
+    if (Number.isNaN(stockValue) || stockValue < 0) {
       toast.error("Please enter a valid stock quantity.");
       return;
     }
 
-    if (!form.category_id) {
-      toast.error("Select a category for this product.");
+    if (!form.supplier_id) {
+      toast.error("Please select a supplier.");
       return;
     }
 
-    if (!form.supplier_id) {
-      toast.error("Select a supplier for this product.");
+    let categoryId = form.category_id ? Number(form.category_id) : undefined;
+    const categoryName = form.category_name.trim();
+
+    if (!categoryId && categoryName) {
+      const matched = categories.find(
+        (cat) => cat.name.toLowerCase() === categoryName.toLowerCase()
+      );
+      if (matched) {
+        categoryId = matched.id;
+      } else {
+        try {
+          const newCategory = await createCategory({ name: categoryName });
+          if (newCategory?.id) {
+            categoryId = newCategory.id;
+            setCategories((prev) => [...prev, newCategory]);
+          }
+        } catch (err) {
+          console.error("Could not create category", err);
+          toast.error(
+            "Unable to create category automatically. Choose an existing one."
+          );
+          return;
+        }
+      }
+    }
+
+    if (!categoryId) {
+      toast.error("Select or enter a category for this product.");
       return;
     }
 
@@ -197,7 +243,7 @@ export default function ManagerProductsPage() {
       sku: (form.sku && form.sku.trim()) || generateSku(trimmedName),
       price: priceValue,
       stock: stockValue,
-      category_id: Number(form.category_id),
+      category_id: categoryId,
       supplier_id: Number(form.supplier_id),
     };
 
@@ -209,7 +255,6 @@ export default function ManagerProductsPage() {
         await createProduct(payload);
         toast.success("Product added successfully!");
       }
-
       setShowForm(false);
       setEditing(null);
       setForm({ ...EMPTY_PRODUCT_FORM });
@@ -224,13 +269,11 @@ export default function ManagerProductsPage() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Products & Categories (Manager)</h1>
 
-      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card><KPI icon={FiBox} label="Total Products" value={stats.total} /></Card>
-        <Card><KPI icon={FiAlertTriangle} label="Low Stock (<10)" value={stats.lowStock} /></Card>
+        <Card><KPI icon={FiAlertTriangle} label="Low Stock (&lt;10)" value={stats.lowStock} /></Card>
       </div>
 
-      {/* Products Table */}
       <Card>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Product List</h2>
@@ -246,12 +289,14 @@ export default function ManagerProductsPage() {
             {
               key: "category_id",
               label: "Category",
-              render: (row) => getCategoryName(row.category_id),
+              render: (row) =>
+                row.category?.name || getCategoryName(row.category_id),
             },
             {
               key: "supplier_id",
               label: "Supplier",
-              render: (row) => getSupplierName(row.supplier_id),
+              render: (row) =>
+                row.supplier?.name || getSupplierName(row.supplier_id),
             },
             { key: "price", label: "Price (KES)", sortable: true },
             {
@@ -261,7 +306,9 @@ export default function ManagerProductsPage() {
               render: (row) => (
                 <span
                   className={`px-2 py-1 rounded text-xs ${
-                    row.stock < 10 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                    Number(row.stock) < 10
+                      ? "bg-red-100 text-red-700"
+                      : "bg-green-100 text-green-700"
                   }`}
                 >
                   {row.stock}
@@ -278,18 +325,14 @@ export default function ManagerProductsPage() {
               onClick={() => {
                 setEditing(row);
                 setForm({
-                  name: row.name,
-                  sku: row.sku,
-                  price: row.price,
-                  stock: row.stock,
-                  category_id:
-                    typeof row.category_id === "number"
-                      ? String(row.category_id)
-                      : "",
-                  supplier_id:
-                    typeof row.supplier_id === "number"
-                      ? String(row.supplier_id)
-                      : "",
+                  name: row.name || "",
+                  sku: row.sku || "",
+                  price: row.price ?? "",
+                  stock: row.stock ?? "",
+                  category_id: row.category_id ? String(row.category_id) : "",
+                  category_name:
+                    row.category?.name || getCategoryName(row.category_id),
+                  supplier_id: row.supplier_id ? String(row.supplier_id) : "",
                 });
                 setShowForm(true);
               }}
@@ -300,7 +343,6 @@ export default function ManagerProductsPage() {
         />
       </Card>
 
-      {/* Add/Edit Modal */}
       {showForm && (
         <ModalCard
           title={editing ? "Edit Product" : "Add Product"}
@@ -318,31 +360,34 @@ export default function ManagerProductsPage() {
                 placeholder="e.g. Coca Cola 500ml"
               />
             </div>
+
             <div className="grid gap-1 text-xs text-gray-500">
               <span>SKU (auto-generated)</span>
               <span className="font-mono text-sm bg-gray-100 px-3 py-2 rounded">
                 {form.sku || "Will generate once the name is provided"}
               </span>
             </div>
+
             <div className="grid gap-1">
               <label className="font-medium">Category</label>
-              <select
-                name="category_id"
-                value={form.category_id}
+              <input
+                list="manager-category-options"
+                name="category_name"
+                value={form.category_name}
                 onChange={handleChange}
                 className="border rounded px-3 py-2"
-              >
-                <option value="">Select category</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
+                placeholder="Start typing to search"
+              />
+              <datalist id="manager-category-options">
+                {categoryOptions.map((name) => (
+                  <option key={name} value={name} />
                 ))}
-              </select>
+              </datalist>
               <span className="text-xs text-gray-500">
-                We attempt to suggest a category from the product name. Adjust as needed.
+                We try to remember categories you’ve used before.
               </span>
             </div>
+
             <div className="grid gap-1">
               <label className="font-medium">Supplier</label>
               <select
@@ -359,6 +404,7 @@ export default function ManagerProductsPage() {
                 ))}
               </select>
             </div>
+
             <div className="grid gap-1">
               <label className="font-medium">Price (KES)</label>
               <input
@@ -371,6 +417,7 @@ export default function ManagerProductsPage() {
                 step="0.01"
               />
             </div>
+
             <div className="grid gap-1">
               <label className="font-medium">Stock</label>
               <input
@@ -382,6 +429,7 @@ export default function ManagerProductsPage() {
                 min="0"
               />
             </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setShowForm(false)}>
                 Cancel

@@ -143,6 +143,13 @@ export async function getCategories() {
   return await apiFetch("/categories");
 }
 
+export async function createCategory(payload) {
+  return await apiFetch("/categories", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 /* ================== SUPPLIERS ================== */
 export async function getSuppliers({ skip = 0, limit = 100 } = {}) {
   const res = await apiFetch(`/suppliers?skip=${skip}&limit=${limit}`);

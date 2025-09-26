@@ -15,6 +15,7 @@ class ProductBase(BaseModel):
     stock: int = Field(default=0, ge=0, description="Available stock quantity")
     category_id: Optional[int] = Field(None, description="Category this product belongs to")
     supplier_id: Optional[int] = Field(None, description="Supplier who provides this product")
+    image_url: Optional[str] = Field(None, description="Image URL or data for the product")
 
     # --- Normalization ---
     @field_validator("name")
@@ -26,6 +27,11 @@ class ProductBase(BaseModel):
     @classmethod
     def normalize_sku(cls, v: str) -> str:
         return v.strip().upper()
+
+    @field_validator("image_url")
+    @classmethod
+    def normalize_image(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if isinstance(v, str) else v
 
 
 # ====== CREATE ======
@@ -42,6 +48,7 @@ class ProductUpdate(BaseModel):
     stock: Optional[int] = Field(None, ge=0)
     category_id: Optional[int]
     supplier_id: Optional[int]
+    image_url: Optional[str]
 
     # --- Normalization for optional fields ---
     @field_validator("name")
@@ -53,6 +60,11 @@ class ProductUpdate(BaseModel):
     @classmethod
     def normalize_sku(cls, v: Optional[str]) -> Optional[str]:
         return v.strip().upper() if v else v
+
+    @field_validator("image_url")
+    @classmethod
+    def normalize_image(cls, v: Optional[str]) -> Optional[str]:
+        return v.strip() if isinstance(v, str) else v
 
 
 # ====== OUT ======

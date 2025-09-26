@@ -59,6 +59,7 @@ def create_product(db: Session, product: ProductCreate):
         stock=product.stock,
         category_id=product.category_id,
         supplier_id=product.supplier_id,
+        image_url=product.image_url,
     )
     db.add(db_product)
     db.commit()

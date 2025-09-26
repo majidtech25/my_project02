@@ -81,6 +81,7 @@ class Product(Base):
     sku = Column(String(50), unique=True, nullable=False)
     price = Column(Float, nullable=False)
     stock = Column(Integer, default=0)
+    image_url = Column(String, nullable=True)
 
     category_id = Column(Integer, ForeignKey("categories.id"))
     supplier_id = Column(Integer, ForeignKey("suppliers.id"))

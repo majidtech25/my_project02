@@ -24,6 +24,7 @@ const EMPTY_PRODUCT_FORM = {
   category_id: "",
   category_name: "",
   supplier_id: "",
+  image_url: "",
 };
 
 const generateSku = (name) => {
@@ -35,8 +36,10 @@ const generateSku = (name) => {
         .toUpperCase()
     : "PROD";
   const suffix = Date.now().toString().slice(-4);
-  return `${base || "PROD"}-${suffix}`;
+  return (base || "PROD") + "-" + suffix;
 };
+
+const placeholderImg = "https://via.placeholder.com/80x80.png?text=No+Image";
 
 export default function ManagerProductsPage() {
   const [loading, setLoading] = useState(false);
@@ -176,11 +179,25 @@ export default function ManagerProductsPage() {
           category_id: match ? String(match.id) : "",
         };
       }
-      if (name === "supplier_id") {
-        return { ...prev, supplier_id: value };
-      }
       return { ...prev, [name]: value };
     });
+  };
+
+  const handleSupplierChange = (e) => {
+    setForm((prev) => ({ ...prev, supplier_id: e.target.value }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) {
+      setForm((prev) => ({ ...prev, image_url: "" }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setForm((prev) => ({ ...prev, image_url: reader.result || "" }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
@@ -245,6 +262,7 @@ export default function ManagerProductsPage() {
       stock: stockValue,
       category_id: categoryId,
       supplier_id: Number(form.supplier_id),
+      image_url: form.image_url || null,
     };
 
     try {
@@ -284,6 +302,17 @@ export default function ManagerProductsPage() {
 
         <DataTable
           columns={[
+            {
+              key: "image_url",
+              label: "Image",
+              render: (row) => (
+                <img
+                  src={row.image_url || placeholderImg}
+                  alt={row.name}
+                  className="h-10 w-10 rounded object-cover border"
+                />
+              ),
+            },
             { key: "name", label: "Name", sortable: true },
             { key: "sku", label: "SKU" },
             {
@@ -303,17 +332,13 @@ export default function ManagerProductsPage() {
               key: "stock",
               label: "Stock",
               sortable: true,
-              render: (row) => (
-                <span
-                  className={`px-2 py-1 rounded text-xs ${
-                    Number(row.stock) < 10
-                      ? "bg-red-100 text-red-700"
-                      : "bg-green-100 text-green-700"
-                  }`}
-                >
-                  {row.stock}
-                </span>
-              ),
+              render: (row) => {
+                const pillClass =
+                  Number(row.stock) < 10
+                    ? "px-2 py-1 rounded text-xs bg-red-100 text-red-700"
+                    : "px-2 py-1 rounded text-xs bg-green-100 text-green-700";
+                return <span className={pillClass}>{row.stock}</span>;
+              },
             },
           ]}
           data={products}
@@ -333,6 +358,7 @@ export default function ManagerProductsPage() {
                   category_name:
                     row.category?.name || getCategoryName(row.category_id),
                   supplier_id: row.supplier_id ? String(row.supplier_id) : "",
+                  image_url: row.image_url || "",
                 });
                 setShowForm(true);
               }}
@@ -384,7 +410,7 @@ export default function ManagerProductsPage() {
                 ))}
               </datalist>
               <span className="text-xs text-gray-500">
-                We try to remember categories you’ve used before.
+                We remember categories you have used previously.
               </span>
             </div>
 
@@ -393,7 +419,7 @@ export default function ManagerProductsPage() {
               <select
                 name="supplier_id"
                 value={form.supplier_id}
-                onChange={handleChange}
+                onChange={handleSupplierChange}
                 className="border rounded px-3 py-2"
               >
                 <option value="">Select supplier</option>
@@ -403,6 +429,26 @@ export default function ManagerProductsPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="grid gap-1">
+              <label className="font-medium">Product Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="border rounded px-3 py-2"
+              />
+              {form.image_url && (
+                <img
+                  src={form.image_url}
+                  alt="Preview"
+                  className="h-20 w-20 rounded object-cover border"
+                />
+              )}
+              <span className="text-xs text-gray-500">
+                Supported formats: PNG, JPG. We store the image with the product for staff to preview.
+              </span>
             </div>
 
             <div className="grid gap-1">

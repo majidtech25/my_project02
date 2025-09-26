@@ -157,7 +157,7 @@ export default function NewSalePage() {
                 onClick={() => addToCart(p)}
               >
                 <img
-                  src={p.image || "https://via.placeholder.com/100"}
+                  src={p.image_url || "https://via.placeholder.com/100"}
                   alt={p.name}
                   className="w-20 h-20 object-cover mb-2"
                 />

@@ -6,12 +6,14 @@ import {
   openSalesDay,
   closeSalesDay,
   getDayHistory,
+  getEmployees,
 } from "../../services/api";
 
 export default function ManagerDayOpsPage() {
   const [dayStatus, setDayStatus] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [employeeLookup, setEmployeeLookup] = useState({});
 
   async function refresh() {
     setLoading(true);
@@ -28,6 +30,27 @@ export default function ManagerDayOpsPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getEmployees({ limit: 500 });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        const lookup = {};
+        list.forEach((emp) => {
+          lookup[emp.id] = emp.name;
+        });
+        setEmployeeLookup(lookup);
+      } catch (err) {
+        console.error("Failed to load employees for day ops", err);
+      }
+    })();
+  }, []);
+
+  const resolveEmployeeName = (id) => {
+    if (!id) return "—";
+    return employeeLookup[id] || `Employee #${id}`;
+  };
 
   async function handleOpenDay() {
     if (!window.confirm("Are you sure you want to open today’s sales?")) return;
@@ -50,11 +73,11 @@ export default function ManagerDayOpsPage() {
             <h2 className="text-lg font-semibold">Day Control</h2>
             {dayStatus?.isOpen ? (
               <p className="text-green-600">
-                Sales are OPEN for {dayStatus.date}
+                Sales are OPEN for {dayStatus.date}. Opened by {resolveEmployeeName(dayStatus?.openedById)}.
               </p>
             ) : (
               <p className="text-red-600">
-                Sales are CLOSED. Open to start a new day.
+                Sales are CLOSED. Last opened by {resolveEmployeeName(dayStatus?.openedById)} and closed by {resolveEmployeeName(dayStatus?.closedById)}.
               </p>
             )}
           </div>
@@ -94,12 +117,8 @@ export default function ManagerDayOpsPage() {
                 id: day.id,
                 date: day.date ?? "—",
                 status: day.is_open ? "Open" : "Closed",
-                opened_by: day.opened_by_id
-                  ? `Employee #${day.opened_by_id}`
-                  : "—",
-                closed_by: day.closed_by_id
-                  ? `Employee #${day.closed_by_id}`
-                  : "—",
+                opened_by: resolveEmployeeName(day.opened_by_id),
+                closed_by: resolveEmployeeName(day.closed_by_id),
               }))
             : []}
         />

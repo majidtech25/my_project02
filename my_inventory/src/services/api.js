@@ -276,6 +276,8 @@ export async function getDayStatus() {
       id: openDay.id,
       isOpen: true,
       date: openDay.date,
+      openedById: openDay.opened_by_id,
+      closedById: openDay.closed_by_id,
     };
   }
 
@@ -284,6 +286,8 @@ export async function getDayStatus() {
     id: latest?.id ?? null,
     isOpen: false,
     date: latest?.date ?? null,
+    openedById: latest?.opened_by_id ?? null,
+    closedById: latest?.closed_by_id ?? null,
   };
 }
 

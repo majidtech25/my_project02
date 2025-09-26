@@ -1,6 +1,6 @@
 // src/pages/employer/EmployerProductsPage.jsx
 import React, { useEffect, useState, useCallback } from "react";
-import { getProducts, getCategories } from "../../services/api";
+import { getProducts, getCategories, getSuppliers } from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import DataTable from "../../components/shared/DataTable";
@@ -11,6 +11,7 @@ export default function EmployerProductsPage() {
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [stats, setStats] = useState({ total: 0 });
 
   // ✅ Load products
@@ -43,6 +44,14 @@ export default function EmployerProductsPage() {
   useEffect(() => {
     loadProducts();
     loadCategories();
+    (async () => {
+      try {
+        const supRes = await getSuppliers({ limit: 200 });
+        setSuppliers(Array.isArray(supRes?.data) ? supRes.data : []);
+      } catch (err) {
+        console.error("Error loading suppliers:", err);
+      }
+    })();
   }, [loadProducts, loadCategories]);
 
   return (
@@ -89,6 +98,17 @@ export default function EmployerProductsPage() {
         <h2 className="text-lg font-semibold mb-4">Products</h2>
         <DataTable
           columns={[
+            {
+              key: "image_url",
+              label: "Image",
+              render: (row) => (
+                <img
+                  src={row.image_url || "https://via.placeholder.com/60x60.png?text=No+Image"}
+                  alt={row.name}
+                  className="h-10 w-10 rounded object-cover border"
+                />
+              ),
+            },
             { key: "name", label: "Name", sortable: true },
             { key: "sku", label: "SKU" },
             {
@@ -119,10 +139,10 @@ export default function EmployerProductsPage() {
             {
               key: "supplier_id",
               label: "Supplier",
-              render: (row) =>
-                typeof row.supplier_id === "number"
-                  ? `Supplier #${row.supplier_id}`
-                  : "—",
+              render: (row) => {
+                const supplier = suppliers.find((sup) => sup.id === row.supplier_id);
+                return supplier?.name || "—";
+              },
             },
           ]}
           data={products}

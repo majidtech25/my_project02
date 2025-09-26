@@ -29,7 +29,6 @@ import ManagerSuppliersPage from "../pages/manager/ManagerSuppliersPage";
 
 // Employee Pages
 import EmployeeDashboard from "../pages/employee/EmployeeDashboard"; // ✅ fixed spelling
-import EmployeeProfilePage from "../pages/employee/EmployeeProfilePage";
 import NewSalesPage from "../pages/employee/NewSalePage";
 import PendingBillsPage from "../pages/employee/PendingBillsPage";
 import SalesHistoryPage from "../pages/employee/SalesHistoryPage";
@@ -115,7 +114,6 @@ export default function AppRouter() {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<EmployeeDashboard />} />
-          <Route path="profile" element={<EmployeeProfilePage />} />
           <Route path="new-sale" element={<NewSalesPage />} />
           <Route path="pending-bills" element={<PendingBillsPage />} />
           <Route path="sales-history" element={<SalesHistoryPage />} />

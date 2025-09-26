@@ -64,7 +64,6 @@ const menuConfig = {
       path: "/employee/sales-history",
       icon: FaHistory,
     },
-    { label: "Profile", path: "/employee/profile", icon: FaUserEdit }, // cleaner wording
   ],
 };
 

@@ -1,160 +1,123 @@
-// src/components/shared/DataTable.jsx
-import React, { useState } from "react";
+// src/pages/employer/EmployerCreditManagementPage.jsx
+import React, { useState, useEffect, useCallback } from "react";
+import { getCreditSummary, markCreditCleared } from "../../services/api";
+import Card from "../../components/shared/Card";
+import KPI from "../../components/shared/KPI";
+import Button from "../../components/shared/Button";
+import DataTable from "../../components/shared/DataTable";
+import { toast } from "react-toastify";
+import { FiCreditCard } from "react-icons/fi";
 
-export default function DataTable({
-  title,
-  columns,
-  data = [],
-  loading,
-  pageSize = 5,
-  actions, // top-level actions (Clear Selected etc.)
-  rowActions, // per-row action buttons
-  onSelect, // callback for selected row IDs
-  idKey = "id", // which key to use as row identifier
-}) {
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ key: null, asc: true });
-  const [selected, setSelected] = useState([]);
+export default function EmployerCreditManagementPage() {
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState("open");
+  const [rows, setRows] = useState([]);
+  const [stats, setStats] = useState({ open: 0, cleared: 0 });
 
-  if (loading) {
-    return (
-      <div className="p-6 text-center text-gray-500">Loading records...</div>
-    );
-  }
+  const loadCredits = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getCreditSummary({ tab });
+      const list = Array.isArray(res?.data) ? res.data : [];
+      setRows(list);
 
-  const sorted = [...data].sort((a, b) => {
-    if (!sort.key) return 0;
-    const valA = a[sort.key];
-    const valB = b[sort.key];
-    if (valA < valB) return sort.asc ? -1 : 1;
-    if (valA > valB) return sort.asc ? 1 : -1;
-    return 0;
-  });
+      if (tab === "open") {
+        setStats((s) => ({ ...s, open: list.length }));
+      } else {
+        setStats((s) => ({ ...s, cleared: list.length }));
+      }
+    } catch (err) {
+      console.error("Error loading credits:", err);
+      toast.error("Failed to load credit records.");
+    } finally {
+      setLoading(false);
+    }
+  }, [tab]);
 
-  const start = (page - 1) * pageSize;
-  const paginated = sorted.slice(start, start + pageSize);
-  const totalPages = Math.ceil(data.length / pageSize);
+  useEffect(() => {
+    loadCredits();
+  }, [loadCredits]);
 
-  // ✅ Selection handlers
-  const toggleSelect = (id) => {
-    const updated = selected.includes(id)
-      ? selected.filter((s) => s !== id)
-      : [...selected, id];
-    setSelected(updated);
-    onSelect?.(updated);
-  };
-
-  const toggleSelectAll = () => {
-    if (paginated.every((row) => selected.includes(row[idKey]))) {
-      const updated = selected.filter(
-        (id) => !paginated.some((row) => row[idKey] === id)
-      );
-      setSelected(updated);
-      onSelect?.(updated);
-    } else {
-      const newIds = [
-        ...new Set([...selected, ...paginated.map((row) => row[idKey])]),
-      ];
-      setSelected(newIds);
-      onSelect?.(newIds);
+  const handleClear = async (id) => {
+    try {
+      await markCreditCleared(id);
+      toast.success("Credit cleared successfully.");
+      loadCredits();
+    } catch (err) {
+      console.error("Error clearing credit:", err);
+      toast.error("Failed to clear credit.");
     }
   };
 
   return (
-    <div className="space-y-4">
-      {/* Title */}
-      {title && <h2 className="text-lg font-semibold">{title}</h2>}
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Credit Management (Employer)</h1>
 
-      {/* Global Actions */}
-      {actions && <div className="mb-2">{actions(selected)}</div>}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <KPI icon={FiCreditCard} label="Pending Credits" value={stats.open} />
+        </Card>
+        <Card>
+          <KPI icon={FiCreditCard} label="Cleared Credits" value={stats.cleared} />
+        </Card>
+      </div>
 
-      {/* Table */}
-      <table className="min-w-full text-sm border rounded overflow-hidden">
-        <thead className="bg-gray-100 dark:bg-gray-800">
-          <tr>
-            {/* Checkbox column */}
-            <th className="px-3 py-2">
-              <input
-                type="checkbox"
-                checked={
-                  paginated.length > 0 &&
-                  paginated.every((row) => selected.includes(row[idKey]))
-                }
-                onChange={toggleSelectAll}
-              />
-            </th>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className="text-left px-3 py-2 cursor-pointer"
-                onClick={() =>
-                  setSort({
-                    key: col.key,
-                    asc: sort.key === col.key ? !sort.asc : true,
-                  })
-                }
-              >
-                {col.label}
-                {sort.key === col.key ? (sort.asc ? " ▲" : " ▼") : ""}
-              </th>
-            ))}
-            {rowActions && <th className="px-3 py-2">Actions</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.length === 0 ? (
-            <tr>
-              <td
-                colSpan={columns.length + (rowActions ? 2 : 1)}
-                className="p-6 text-center text-gray-500"
-              >
-                No records found
-              </td>
-            </tr>
-          ) : (
-            paginated.map((row, i) => (
-              <tr key={i} className="border-t hover:bg-gray-50">
-                <td className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(row[idKey])}
-                    onChange={() => toggleSelect(row[idKey])}
-                  />
-                </td>
-                {columns.map((col) => (
-                  <td key={col.key} className="px-3 py-2">
-                    {col.render ? col.render(row) : row[col.key]}
-                  </td>
-                ))}
-                {rowActions && <td className="px-3 py-2">{rowActions(row)}</td>}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-end gap-2 mt-2 text-sm">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage(page - 1)}
-            className="px-2 py-1 border rounded disabled:opacity-50"
+      <Card>
+        <div className="flex gap-4 mb-4">
+          <Button
+            variant={tab === "open" ? "primary" : "secondary"}
+            onClick={() => setTab("open")}
           >
-            Prev
-          </button>
-          <span className="px-2 py-1">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            disabled={page === totalPages}
-            onClick={() => setPage(page + 1)}
-            className="px-2 py-1 border rounded disabled:opacity-50"
+            Open Credits
+          </Button>
+          <Button
+            variant={tab === "cleared" ? "primary" : "secondary"}
+            onClick={() => setTab("cleared")}
           >
-            Next
-          </button>
+            Cleared Credits
+          </Button>
         </div>
-      )}
+
+        <DataTable
+          columns={[
+            { key: "customer", label: "Customer", sortable: true },
+            { key: "amount", label: "Amount (KES)", sortable: true },
+            { key: "date", label: "Date", sortable: true },
+            { key: "staff", label: "Handled By" },
+            tab === "cleared" && { key: "clearedOn", label: "Cleared On" },
+          ].filter(Boolean)}
+          data={rows}
+          loading={loading}
+          actions={
+            tab === "open"
+              ? () =>
+                  rows.length === 0 ? null : (
+                    <Button
+                      variant="primary"
+                      onClick={() =>
+                        toast.info("Select a credit row to clear individually.")
+                      }
+                    >
+                      Clear Selected
+                    </Button>
+                  )
+              : null
+          }
+          rowActions={
+            tab === "open"
+              ? (row) => (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleClear(row.id)}
+                  >
+                    Clear
+                  </Button>
+                )
+              : undefined
+          }
+        />
+      </Card>
     </div>
   );
 }

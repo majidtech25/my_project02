@@ -1,4 +1,5 @@
 # backend/routes/sales.py
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from db import get_db
@@ -21,6 +22,31 @@ def read_sales(
     Roles: Employer, Manager only.
     """
     return crud_sale.get_sales(db, skip=skip, limit=limit)
+
+
+@router.get("/my", response_model=list[SaleOut])
+def read_my_sales(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_role(["employee", "manager", "employer"]))
+):
+    """
+    📄 View sales recorded by the current employee (optional date filter).
+    Employees only see their own records. Managers/Employers can check theirs via this endpoint.
+    """
+    if start_date and end_date and end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date cannot be earlier than start_date",
+        )
+
+    return crud_sale.get_sales_for_employee(
+        db,
+        employee_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 @router.get("/{sale_id}", response_model=SaleOut)

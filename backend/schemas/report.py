@@ -28,6 +28,12 @@ class SalesByCategory(BaseModel):
     number_of_items: int
 
 
+class SalesByPaymentMethod(BaseModel):
+    payment_method: str
+    total_sales: float
+    number_of_sales: int
+
+
 # ===== Credit Report =====
 class CreditSummary(BaseModel):
     open_credits: float
@@ -52,6 +58,7 @@ class ReportOut(BaseModel):
     sales_summary: SalesSummary
     sales_by_employee: List[SalesByEmployee]
     sales_by_category: List[SalesByCategory]
+    sales_by_payment_method: List[SalesByPaymentMethod]
     credit_summary: CreditSummary
     day_report: Optional[DayReport] = None
 

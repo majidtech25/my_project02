@@ -177,7 +177,7 @@ export async function updateSupplier(id, payload) {
 /* ================== SALES ================== */
 export async function createSale(order) {
   const payload = {
-    employee_id: order.employee_id,
+    employee_id: Number(order.employee_id),
     items: Array.isArray(order.items)
       ? order.items
           .map((item) => ({
@@ -189,15 +189,36 @@ export async function createSale(order) {
             product_id: item.product_id ? Number(item.product_id) : undefined,
             quantity: Number(item.quantity) || 1,
           }))
-          .filter((item) => Number.isFinite(item.product_id))
+          .filter((item) => Number.isFinite(item.product_id) && item.quantity > 0)
       : [],
     is_credit: Boolean(order.is_credit),
   };
+
+  if (payload.items.length === 0) {
+    throw new Error("Order must include at least one valid item");
+  }
+
+  if (!payload.is_credit) {
+    const method = order.payment_method ?? order.paymentMethod;
+    if (!method) {
+      throw new Error("Paid orders require a payment method");
+    }
+    payload.payment_method = method;
+  }
 
   return await apiFetch("/sales", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getMySales({ startDate, endDate } = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
+
+  const query = params.toString();
+  return await apiFetch(`/sales/my${query ? `?${query}` : ""}`);
 }
 
 /* ================== CREDITS ================== */
@@ -227,15 +248,19 @@ export async function getCreditSummary({ tab = "open" } = {}) {
   };
 }
 
-export async function markCreditCleared(id) {
+export async function markCreditCleared(id, paymentMethod) {
+  if (!paymentMethod) {
+    throw new Error("Payment method is required to clear a credit");
+  }
+
   return await apiFetch(`/credits/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ status: "cleared" }),
+    body: JSON.stringify({ status: "cleared", payment_method: paymentMethod }),
   });
 }
 
-export async function clearPendingBill(id) {
-  return markCreditCleared(id);
+export async function clearPendingBill(id, paymentMethod) {
+  return markCreditCleared(id, paymentMethod);
 }
 
 export { getCreditSummary as getCreditsSummary };

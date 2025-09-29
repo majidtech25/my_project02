@@ -1,8 +1,10 @@
 # backend/schemas/credit.py
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 from enum import Enum
+
+from .sale import PaymentMethod
 
 
 # ====== ENUM ======
@@ -28,12 +30,22 @@ class CreditCreate(BaseModel):
 class CreditUpdate(BaseModel):
     """Only status updates are allowed, and only to 'cleared'."""
     status: Optional[CreditStatus] = Field(None, description="Can only be updated to 'cleared'")
+    payment_method: Optional[PaymentMethod] = Field(
+        None,
+        description="Required when clearing a credit to capture payment method",
+    )
 
     @field_validator("status")
     def validate_update_status(cls, v: Optional[CreditStatus]):
         if v and v != CreditStatus.cleared:
             raise ValueError("Credit status can only be updated to 'cleared'")
         return v
+
+    @model_validator(mode="after")
+    def validate_payment_method(cls, values):
+        if values.status == CreditStatus.cleared and not values.payment_method:
+            raise ValueError("Payment method is required when clearing a credit")
+        return values
 
 
 # ====== OUT ======

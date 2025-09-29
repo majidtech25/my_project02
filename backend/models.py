@@ -1,5 +1,14 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Date, Enum, ForeignKey, DateTime, Boolean, UniqueConstraint
+    Column,
+    Integer,
+    String,
+    Float,
+    Date,
+    Enum,
+    ForeignKey,
+    DateTime,
+    Boolean,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from db import Base
@@ -12,6 +21,12 @@ class EmployeeRole(enum.Enum):
     employer = "employer"
     manager = "manager"
     employee = "employee"
+
+
+class PaymentMethod(enum.Enum):
+    cash = "cash"
+    mpesa = "mpesa"
+    card = "card"
 
 
 # ================= EMPLOYEE =================
@@ -101,6 +116,9 @@ class Sale(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(DateTime, nullable=False, default=datetime.utcnow)
     total_amount = Column(Float, nullable=False)
+    payment_method = Column(Enum(PaymentMethod), nullable=True)
+    is_paid = Column(Boolean, nullable=False, default=False)
+    is_credit = Column(Boolean, nullable=False, default=False)
 
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
 
@@ -127,6 +145,10 @@ class SaleItem(Base):
 
     def __repr__(self):
         return f"<SaleItem(product={self.product_id}, qty={self.quantity}, price={self.price})>"
+
+    @property
+    def product_name(self):
+        return self.product.name if self.product else None
 
 
 # ================= CREDIT =================

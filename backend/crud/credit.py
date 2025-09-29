@@ -57,6 +57,12 @@ def create_credit(db: Session, credit: CreditCreate):
         updated_at=datetime.utcnow(),
     )
     db.add(db_credit)
+
+    # ensure sale reflects credit status
+    sale.is_credit = True
+    sale.is_paid = False
+    sale.payment_method = None
+
     db.commit()
     db.refresh(db_credit)
     return db_credit
@@ -72,8 +78,23 @@ def update_credit(db: Session, credit_id: int, credit: CreditUpdate):
         return None
 
     if credit.status and credit.status == CreditStatus.cleared:
+        if not credit.payment_method:
+            raise ValueError("Payment method is required when clearing a credit")
+
+        payment_method_value = (
+            credit.payment_method.value
+            if hasattr(credit.payment_method, "value")
+            else credit.payment_method
+        )
+
         db_credit.status = CreditStatus.cleared.value
         db_credit.updated_at = datetime.utcnow()
+
+        # update linked sale to reflect payment completion
+        sale = db_credit.sale
+        sale.is_credit = False
+        sale.is_paid = True
+        sale.payment_method = models.PaymentMethod(payment_method_value)
     else:
         raise ValueError("Only status update to 'cleared' is allowed")
 
@@ -99,5 +120,10 @@ def delete_credit(db: Session, credit_id: int):
         raise ValueError("Cannot delete credit: the sales day is already closed")
 
     db.delete(db_credit)
+    sale = db_credit.sale
+    if sale:
+        sale.is_credit = False
+        sale.is_paid = False
+        sale.payment_method = None
     db.commit()
     return True

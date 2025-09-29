@@ -2,6 +2,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date
+from enum import Enum
+
+
+# ====== PAYMENT METHOD ======
+class PaymentMethod(str, Enum):
+    cash = "cash"
+    mpesa = "mpesa"
+    card = "card"
 
 
 # ====== SALE ITEM ======
@@ -18,6 +26,9 @@ class SaleItemCreate(SaleItemBase):
 class SaleItemOut(SaleItemBase):
     id: int
     price: float = Field(..., gt=0, le=1_000_000, description="Price per unit at sale time")
+    product_name: Optional[str] = Field(
+        None, description="Snapshot of the product name at time of sale"
+    )
 
     class Config:
         from_attributes = True
@@ -33,6 +44,10 @@ class SaleCreate(SaleBase):
     is_credit: Optional[bool] = Field(
         False, description="Mark sale as credit (default: False)"
     )
+    payment_method: Optional[PaymentMethod] = Field(
+        None,
+        description="Required when sale is paid. One of: cash, mpesa, card",
+    )
 
 
 class SaleUpdate(BaseModel):
@@ -45,6 +60,9 @@ class SaleOut(SaleBase):
     date: date
     total_amount: float = Field(..., ge=0, description="Total amount of the sale")
     items: List[SaleItemOut]
+    payment_method: Optional[PaymentMethod]
+    is_paid: bool
+    is_credit: bool
 
     class Config:
         from_attributes = True

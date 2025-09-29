@@ -63,6 +63,24 @@ def get_sale(db: Session, sale_id: int):
     return db.query(models.Sale).filter(models.Sale.id == sale_id).first()
 
 
+def get_sales_for_employee(
+    db: Session,
+    employee_id: int,
+    start_date: date | None = None,
+    end_date: date | None = None,
+):
+    """Fetch sales recorded by a specific employee within optional date bounds."""
+    query = db.query(models.Sale).filter(models.Sale.employee_id == employee_id)
+
+    if start_date:
+        query = query.filter(models.Sale.date >= start_date)
+    if end_date:
+        # include the entire day for end_date by adding 1 day and subtracting microsecond
+        query = query.filter(models.Sale.date <= end_date)
+
+    return query.order_by(models.Sale.date.desc()).all()
+
+
 def create_sale(db: Session, sale: SaleCreate):
     """Create a sale, deduct stock, and create credit if applicable."""
     validate_day_open(db)
@@ -71,18 +89,36 @@ def create_sale(db: Session, sale: SaleCreate):
     try:
         total_amount, sale_items = calculate_total_and_items(db, sale.items)
 
+        is_credit_sale = bool(sale.is_credit)
+        if is_credit_sale:
+            payment_method = None
+            is_paid = False
+        else:
+            if not sale.payment_method:
+                raise ValueError("Payment method is required for paid sales")
+            payment_method_value = (
+                sale.payment_method.value
+                if hasattr(sale.payment_method, "value")
+                else sale.payment_method
+            )
+            payment_method = models.PaymentMethod(payment_method_value)
+            is_paid = True
+
         db_sale = models.Sale(
             date=date.today(),
             total_amount=total_amount,
             employee_id=employee.id,
             items=sale_items,
+            payment_method=payment_method,
+            is_paid=is_paid,
+            is_credit=is_credit_sale,
         )
         db.add(db_sale)
         db.commit()
         db.refresh(db_sale)
 
         # Handle credit
-        if sale.is_credit:
+        if is_credit_sale:
             if db_sale.credit:
                 raise ValueError("This sale already has a credit record")
             db_credit = models.Credit(

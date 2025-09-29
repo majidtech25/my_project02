@@ -15,6 +15,13 @@ def daily_sales_report(db: Session, report_date: date | None = None):
         .scalar() or 0.0
     )
 
+    paid_sales = (
+        db.query(func.sum(models.Sale.total_amount))
+        .filter(models.Sale.date == report_date, models.Sale.is_paid == True)
+        .scalar()
+        or 0.0
+    )
+
     number_of_sales = (
         db.query(func.count(models.Sale.id))
         .filter(models.Sale.date == report_date)
@@ -31,17 +38,44 @@ def daily_sales_report(db: Session, report_date: date | None = None):
     )
     total_credits = sum([c[1] for c in credits if c[0] == "open"]) or 0.0
     cleared_credits = sum([c[1] for c in credits if c[0] == "cleared"]) or 0.0
-    total_cash = total_sales - total_credits
+
+    payment_breakdown_query = (
+        db.query(
+            models.Sale.payment_method,
+            func.count(models.Sale.id),
+            func.sum(models.Sale.total_amount),
+        )
+        .filter(models.Sale.date == report_date, models.Sale.is_paid == True)
+        .group_by(models.Sale.payment_method)
+        .all()
+    )
+
+    payment_breakdown_map = {
+        method.value: {"payment_method": method.value, "total_sales": 0.0, "number_of_sales": 0}
+        for method in models.PaymentMethod
+    }
+
+    for method, count, amount in payment_breakdown_query:
+        if not method:
+            continue
+        payment_breakdown_map[method.value] = {
+            "payment_method": method.value,
+            "total_sales": float(amount or 0.0),
+            "number_of_sales": int(count or 0),
+        }
+
+    payment_breakdown = list(payment_breakdown_map.values())
 
     return {
         "sales_summary": {
             "total_sales": float(total_sales),
             "total_credits": float(total_credits),
-            "total_cash": float(total_cash),
+            "total_cash": float(paid_sales),
             "number_of_sales": number_of_sales,
         },
         "sales_by_employee": [],
         "sales_by_category": [],
+        "sales_by_payment_method": payment_breakdown,
         "credit_summary": {
             "open_credits": float(total_credits),
             "cleared_credits": float(cleared_credits),
@@ -55,7 +89,7 @@ def daily_sales_report(db: Session, report_date: date | None = None):
             "closed_by": None,
             "total_sales": float(total_sales),
             "total_credits": float(total_credits),
-            "total_cash": float(total_cash),
+            "total_cash": float(paid_sales),
         },
     }
 
@@ -68,21 +102,64 @@ def sales_report_period(db: Session, start_date: date, end_date: date):
         .scalar() or 0.0
     )
 
+    paid_sales = (
+        db.query(func.sum(models.Sale.total_amount))
+        .filter(
+            models.Sale.date >= start_date,
+            models.Sale.date <= end_date,
+            models.Sale.is_paid == True,
+        )
+        .scalar()
+        or 0.0
+    )
+
     number_of_sales = (
         db.query(func.count(models.Sale.id))
         .filter(models.Sale.date >= start_date, models.Sale.date <= end_date)
         .scalar() or 0
     )
 
+    payment_breakdown_query = (
+        db.query(
+            models.Sale.payment_method,
+            func.count(models.Sale.id),
+            func.sum(models.Sale.total_amount),
+        )
+        .filter(
+            models.Sale.date >= start_date,
+            models.Sale.date <= end_date,
+            models.Sale.is_paid == True,
+        )
+        .group_by(models.Sale.payment_method)
+        .all()
+    )
+
+    payment_breakdown_map = {
+        method.value: {"payment_method": method.value, "total_sales": 0.0, "number_of_sales": 0}
+        for method in models.PaymentMethod
+    }
+
+    for method, count, amount in payment_breakdown_query:
+        if not method:
+            continue
+        payment_breakdown_map[method.value] = {
+            "payment_method": method.value,
+            "total_sales": float(amount or 0.0),
+            "number_of_sales": int(count or 0),
+        }
+
+    payment_breakdown = list(payment_breakdown_map.values())
+
     return {
         "sales_summary": {
             "total_sales": float(total_sales),
             "total_credits": 0.0,
-            "total_cash": float(total_sales),
+            "total_cash": float(paid_sales),
             "number_of_sales": number_of_sales,
         },
         "sales_by_employee": [],
         "sales_by_category": [],
+        "sales_by_payment_method": payment_breakdown,
         "credit_summary": {
             "open_credits": 0.0,
             "cleared_credits": 0.0,

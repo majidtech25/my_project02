@@ -1,68 +1,140 @@
 // src/pages/employee/EmployeeDashboard.jsx
 import React, { useEffect, useState, useCallback } from "react";
-import { getReports, getCreditSummary } from "../../services/api";
+import { getMySales } from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import DataTable from "../../components/shared/DataTable";
-import Button from "../../components/shared/Button";
 import { toast } from "react-toastify";
-import { FiDollarSign, FiCreditCard, FiTrendingUp } from "react-icons/fi";
+import { FiDollarSign, FiCreditCard } from "react-icons/fi";
+import Button from "../../components/shared/Button";
+import { useAuth } from "../../context/AuthContext";
+
+function formatCurrency(value) {
+  return `KES ${Number(value || 0).toLocaleString()}`;
+}
+
+function normalizeDateKey(value) {
+  if (!value) return null;
+  if (typeof value === "string" && value.length >= 10) return value.slice(0, 10);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  if (typeof value === "string" && value.length <= 10) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString() + " " + parsed.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function EmployeeDashboard() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({
     salesToday: 0,
-    pendingCredits: 0,
+    pendingCreditCount: 0,
+    pendingCreditAmount: 0,
   });
   const [recent, setRecent] = useState([]);
 
+  const todayKey = new Date().toISOString().slice(0, 10);
+
   // ✅ Load employee dashboard data
   const loadDashboard = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const [reportsRes, creditsRes] = await Promise.all([
-        getReports(),
-        getCreditSummary({ tab: "open" }),
+      const [todaySales, allSales] = await Promise.all([
+        getMySales({ startDate: todayKey, endDate: todayKey }),
+        getMySales(),
       ]);
 
-      const salesSummary = reportsRes?.sales_summary || {};
-      const dayReport = reportsRes?.day_report;
+      const combinedSales = Array.isArray(allSales) ? allSales : [];
+      const todayList = combinedSales.filter(
+        (sale) => normalizeDateKey(sale.date) === todayKey
+      );
+      const fallbackToday = Array.isArray(todaySales) ? todaySales : [];
+      const effectiveToday = todayList.length > 0 ? todayList : fallbackToday;
+
+      const todayTotal = effectiveToday.reduce(
+        (sum, sale) => sum + (sale.total_amount || 0),
+        0
+      );
+
+      const pendingCredits = combinedSales.filter((sale) => sale.is_credit);
+      const pendingCreditCount = pendingCredits.length;
+      const pendingCreditAmount = pendingCredits.reduce(
+        (sum, sale) => sum + (sale.total_amount || 0),
+        0
+      );
+
+      const recentRows = [...combinedSales]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 10)
+        .map((sale) => ({
+          id: sale.id,
+          date: sale.date,
+          total: sale.total_amount,
+          status: sale.is_credit
+            ? "Credit (pending)"
+            : sale.is_paid
+            ? "Paid"
+            : "Unpaid",
+          payment: sale.payment_method || (sale.is_credit ? "Credit" : "—"),
+        }));
 
       setStats({
-        salesToday: salesSummary.total_sales || 0,
-        pendingCredits: creditsRes?.data?.length || 0,
+        salesToday: todayTotal,
+        pendingCreditCount,
+        pendingCreditAmount,
       });
-
-      const tableRows = [];
-      if (dayReport) {
-        tableRows.push({
-          id: dayReport.date,
-          date: dayReport.date,
-          sales: salesSummary.total_sales || 0,
-          creditOpen: salesSummary.total_credits || 0,
-          creditCleared: salesSummary.total_cash || 0,
-        });
-      }
-
-      setRecent(tableRows);
+      setRecent(recentRows);
     } catch (err) {
       console.error("Error loading employee dashboard:", err);
       toast.error("Failed to load employee dashboard.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id, todayKey]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
+  useEffect(() => {
+    const handler = (event) => {
+      const key = event instanceof StorageEvent ? event.key : event.type;
+      if (key === "ims:sale:created") {
+        loadDashboard();
+      }
+    };
+    window.addEventListener("ims:sale:created", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("ims:sale:created", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, [loadDashboard]);
+
   // ✅ Table columns
   const columns = [
     { key: "date", label: "Date", sortable: true },
-    { key: "sales", label: "Sales (KES)", sortable: true },
-    { key: "creditOpen", label: "Open Credit", sortable: true },
-    { key: "creditCleared", label: "Cleared Credit", sortable: true },
+    {
+      key: "total",
+      label: "Amount (KES)",
+      sortable: true,
+      render: (row) => formatCurrency(row.total),
+    },
+    { key: "payment", label: "Payment Method" },
+    { key: "status", label: "Status" },
   ];
 
   return (
@@ -75,30 +147,32 @@ export default function EmployeeDashboard() {
           <KPI
             icon={FiDollarSign}
             label="Sales Today"
-            value={`KES ${stats.salesToday.toLocaleString()}`}
+            value={formatCurrency(stats.salesToday)}
           />
         </Card>
         <Card>
           <KPI
             icon={FiCreditCard}
             label="Pending Credits"
-            value={stats.pendingCredits}
+            value={`${stats.pendingCreditCount} (${formatCurrency(
+              stats.pendingCreditAmount
+            )})`}
           />
         </Card>
       </div>
 
       {/* Recent Sales */}
       <Card>
-        <h2 className="text-lg font-semibold mb-2">Recent Sales (Last 5 Days)</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold">Recent Sales</h2>
+          <Button variant="primary" onClick={loadDashboard} disabled={loading}>
+            Refresh
+          </Button>
+        </div>
         <DataTable
           columns={columns}
           data={recent}
           loading={loading}
-          actions={
-            <Button variant="primary" onClick={loadDashboard}>
-              Refresh
-            </Button>
-          }
         />
       </Card>
     </div>

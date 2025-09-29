@@ -31,23 +31,27 @@ def get_day(db: Session, day_id: int):
     return db.query(models.Day).filter(models.Day.id == day_id).first()
 
 
+def get_current_day(db: Session) -> models.Day | None:
+    """Return the latest day record (today or most recent historical)."""
+    return (
+        db.query(models.Day)
+        .order_by(models.Day.date.desc(), models.Day.id.desc())
+        .first()
+    )
+
+
 def open_day(db: Session, employee_id: int) -> models.Day:
-    """Open a new business day."""
+    """Open the business day for today. Once closed it cannot reopen."""
     today = get_today()
 
-    # Ensure no open day already exists for today
-    existing_open = db.query(models.Day).filter(
-        models.Day.date == today, models.Day.is_open == True  # noqa: E712
-    ).first()
-    if existing_open:
-        raise ValueError("Day is already open")
-
-    # Ensure no duplicate date record
-    existing_day = db.query(models.Day).filter(models.Day.date == today).first()
-    if existing_day:
-        raise ValueError("Day already exists for today")
-
     employee = validate_employee_active(db, employee_id)
+
+    existing_day = db.query(models.Day).filter(models.Day.date == today).first()
+
+    if existing_day:
+        if existing_day.is_open:
+            raise ValueError("Day is already open")
+        raise ValueError("Day was already closed and cannot be reopened")
 
     db_day = models.Day(
         date=today,

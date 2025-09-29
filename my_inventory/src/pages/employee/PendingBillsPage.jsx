@@ -1,6 +1,12 @@
 // src/pages/employee/PendingBillsPage.jsx
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { getCreditSummary, markCreditCleared, getMySales } from "../../services/api";
+import {
+  getCreditSummary,
+  markCreditCleared,
+  getMySales,
+  fetchSales,
+  getEmployees,
+} from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import DataTable from "../../components/shared/DataTable";
@@ -20,10 +26,27 @@ function formatCurrency(value) {
   });
 }
 
+function normalizeDateKey(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    if (value.length >= 10) return value.slice(0, 10);
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function formatDate(value) {
   if (!value) return "—";
+  if (typeof value === "string" && value.length <= 10) {
+    return value;
+  }
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
+  if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleDateString() + " " + parsed.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -134,10 +157,46 @@ export default function PendingBillsPage() {
       return [];
     }
   });
-
   const role = (user?.role || "").toString().toLowerCase();
   const canRestore = role && role !== "employee";
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [receiptScope, setReceiptScope] = useState("recent"); // 'today' | 'recent'
+  const [employeeLookup, setEmployeeLookup] = useState(() => {
+    const initial = {};
+    if (user?.id) {
+      initial[user.id] = user.name || `Employee #${user.id}`;
+    }
+    return initial;
+  });
+
+  const resolveEmployeeName = useCallback(
+    (id) => {
+      if (!id) return "—";
+      if (employeeLookup[id]) return employeeLookup[id];
+      if (user?.id === id && user?.name) return user.name;
+      return `Employee #${id}`;
+    },
+    [employeeLookup, user?.id, user?.name]
+  );
+
+  useEffect(() => {
+    if (role === "employee") return;
+    (async () => {
+      try {
+        const res = await getEmployees({ limit: 500 });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setEmployeeLookup((prev) => {
+          const next = { ...prev };
+          list.forEach((emp) => {
+            next[emp.id] = emp.name || `Employee #${emp.id}`;
+          });
+          return next;
+        });
+      } catch (err) {
+        console.error("Failed to load employee names", err);
+      }
+    })();
+  }, [role]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -151,46 +210,94 @@ export default function PendingBillsPage() {
   const loadCredits = useCallback(async () => {
     setCreditLoading(true);
     try {
-      const res = await getCreditSummary({ tab: "open" });
-      setCredits(res?.data || []);
+      if (role === "employee") {
+        const res = await getMySales();
+        const list = Array.isArray(res)
+          ? res.filter((sale) => sale.is_credit)
+          : [];
+        const mapped = list.map((sale) => ({
+          id: sale.id,
+          sale_id: sale.id,
+          amount: sale.total_amount || 0,
+          date: sale.date,
+          employee_id: sale.employee_id,
+          staff: sale.employee_id,
+        }));
+        setCredits(mapped);
+      } else {
+        const res = await getCreditSummary({ tab: "open" });
+        setCredits(res?.data || []);
+      }
     } catch (err) {
       console.error("Error loading credit bills:", err);
       toast.error("Failed to load credit bills.");
     } finally {
       setCreditLoading(false);
     }
-  }, []);
+  }, [role]);
 
   const loadReceipts = useCallback(async () => {
     setReceiptLoading(true);
     try {
-      const res = await getMySales({ startDate: todayKey, endDate: todayKey });
-      setReceipts(Array.isArray(res) ? res : []);
+      let data;
+      const isEmployee = role === "employee";
+      const wantsToday = receiptScope === "today";
+
+      if (isEmployee) {
+        data = wantsToday
+          ? await getMySales({ startDate: todayKey, endDate: todayKey })
+          : await getMySales();
+      } else {
+        data = wantsToday
+          ? await fetchSales({
+              startDate: todayKey,
+              endDate: todayKey,
+              limit: 500,
+            })
+          : await fetchSales({ limit: 500 });
+      }
+      setReceipts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error loading receipts:", err);
       toast.error("Failed to load receipts.");
     } finally {
       setReceiptLoading(false);
     }
-  }, [todayKey]);
+  }, [role, todayKey, receiptScope]);
 
   useEffect(() => {
     loadCredits();
     loadReceipts();
   }, [loadCredits, loadReceipts]);
 
-  const todaysReceipts = useMemo(() => {
-    return receipts.filter((sale) => {
-      if (!sale?.date) return false;
-      const saleDate = new Date(sale.date);
-      if (Number.isNaN(saleDate.getTime())) return false;
-      return saleDate.toISOString().slice(0, 10) === todayKey;
-    });
-  }, [receipts, todayKey]);
+  useEffect(() => {
+    const handler = (event) => {
+      const isStorageEvent = event instanceof StorageEvent;
+      const key = isStorageEvent ? event.key : event.type;
+      if (key === "ims:sale:created") {
+        loadReceipts();
+        loadCredits();
+      }
+    };
+    window.addEventListener("storage", handler);
+    window.addEventListener("ims:sale:created", handler);
+    return () => {
+      window.removeEventListener("storage", handler);
+      window.removeEventListener("ims:sale:created", handler);
+    };
+  }, [loadReceipts, loadCredits]);
 
-  const visibleReceipts = todaysReceipts.filter(
-    (sale) => !dismissedIds.includes(sale.id)
-  );
+  const filteredReceipts = useMemo(() => {
+    if (receiptScope === "today") {
+      return receipts.filter((sale) => normalizeDateKey(sale?.date) === todayKey);
+    }
+    return receipts;
+  }, [receipts, receiptScope, todayKey]);
+
+  const visibleReceipts = filteredReceipts.filter((sale) => {
+    if (receiptScope === "recent") return true;
+    return !dismissedIds.includes(sale.id);
+  });
   const printableReceipts = visibleReceipts.filter(
     (sale) => sale.is_paid && !sale.is_credit
   );
@@ -205,6 +312,7 @@ export default function PendingBillsPage() {
     creditCount: credits.length,
     creditValue: outstandingCreditValue,
   };
+  const showHandledBy = role !== "employee";
 
   const handlePrintReceipt = (sale) => {
     if (sale.is_credit || !sale.is_paid) {
@@ -293,8 +401,34 @@ export default function PendingBillsPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Today&apos;s Receipts</h2>
           <span className="text-sm text-gray-500">
-            Showing sales recorded on {todayKey}
+            {receiptScope === "today"
+              ? `Showing sales recorded on ${todayKey}`
+              : "Showing recent receipts"}
           </span>
+        </div>
+        <div className="flex gap-2 mb-4">
+          <Button
+            className={`px-3 py-1 text-sm border rounded ${
+              receiptScope === "today"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-700 hover:border-blue-400"
+            }`}
+            onClick={() => setReceiptScope("today")}
+            disabled={receiptScope === "today"}
+          >
+            Today
+          </Button>
+          <Button
+            className={`px-3 py-1 text-sm border rounded ${
+              receiptScope === "recent"
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-700 hover:border-blue-400"
+            }`}
+            onClick={() => setReceiptScope("recent")}
+            disabled={receiptScope === "recent"}
+          >
+            Recent
+          </Button>
         </div>
 
         {receiptLoading ? (
@@ -310,10 +444,15 @@ export default function PendingBillsPage() {
               return (
                 <div key={sale.id} className="border rounded-lg p-4 bg-white shadow-sm">
                   <div className="flex flex-wrap justify-between gap-3">
-                    <div>
-                      <h3 className="text-md font-semibold">Sale #{sale.id}</h3>
-                      <p className="text-sm text-gray-500">Recorded {formatDate(sale.date)}</p>
-                    </div>
+                      <div>
+                        <h3 className="text-md font-semibold">Sale #{sale.id}</h3>
+                        <p className="text-sm text-gray-500">Recorded {formatDate(sale.date)}</p>
+                        {showHandledBy && (
+                          <p className="text-xs text-gray-500">
+                            Handled by {resolveEmployeeName(sale.employee_id)}
+                          </p>
+                        )}
+                      </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-500">
                         {sale.is_credit ? "Status: Credit" : "Status: Paid"}
@@ -389,32 +528,46 @@ export default function PendingBillsPage() {
             { key: "customer", label: "Customer" },
             { key: "amount", label: "Amount (KES)", sortable: true },
             { key: "date", label: "Date", sortable: true },
-            { key: "staff", label: "Handled By" },
+            {
+              key: "staff",
+              label: "Handled By",
+              render: (row) => resolveEmployeeName(row.employee_id),
+            },
           ]}
           data={credits}
           loading={creditLoading}
-          rowActions={(row) => (
-            <div className="flex flex-col gap-1">
-              {PAYMENT_METHODS.map((method) => {
-                const isBusy = clearing.id === row.id && clearing.method === method.id;
-                const disabled = (clearing.id && clearing.id !== row.id) || isBusy;
-                const baseClass = "text-xs px-2 py-1 border rounded transition ";
-                const activeClass = isBusy
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-700 hover:border-blue-400";
-                return (
-                  <button
-                    key={method.id}
-                    onClick={() => handleClearCredit(row.id, method.id)}
-                    disabled={disabled}
-                    className={baseClass + activeClass + (disabled ? " disabled:opacity-50" : "")}
-                  >
-                    {isBusy ? "Clearing..." : "Clear as " + method.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          rowActions={
+            role === "employee"
+              ? undefined
+              : (row) => (
+                  <div className="flex flex-col gap-1">
+                    {PAYMENT_METHODS.map((method) => {
+                      const isBusy =
+                        clearing.id === row.id && clearing.method === method.id;
+                      const disabled =
+                        (clearing.id && clearing.id !== row.id) || isBusy;
+                      const baseClass = "text-xs px-2 py-1 border rounded transition ";
+                      const activeClass = isBusy
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 hover-border-blue-400";
+                      return (
+                        <button
+                          key={method.id}
+                          onClick={() => handleClearCredit(row.id, method.id)}
+                          disabled={disabled}
+                          className={
+                            baseClass +
+                            activeClass +
+                            (disabled ? " disabled:opacity-50" : "")
+                          }
+                        >
+                          {isBusy ? "Clearing..." : "Clear as " + method.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+          }
         />
       </Card>
     </div>

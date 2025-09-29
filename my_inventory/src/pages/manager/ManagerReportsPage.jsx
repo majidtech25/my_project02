@@ -1,11 +1,29 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { getReports } from "../../services/api";
+import {
+  fetchSales,
+  getCreditSummary,
+} from "../../services/api";
 import Card from "../../components/shared/Card";
 import KPI from "../../components/shared/KPI";
 import Button from "../../components/shared/Button";
 import DataTable from "../../components/shared/DataTable";
 import { toast } from "react-toastify";
 import { FiDollarSign, FiCreditCard, FiFileText } from "react-icons/fi";
+
+function formatCurrency(value) {
+  return `KES ${Number(value || 0).toLocaleString()}`;
+}
+
+function normalizeDateKey(value) {
+  if (!value) return null;
+  if (typeof value === "string" && value.length >= 10) return value.slice(0, 10);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export default function ManagerReportsPage() {
   const [loading, setLoading] = useState(false);
@@ -21,9 +39,86 @@ export default function ManagerReportsPage() {
   const loadReports = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getReports(filters);
-      setStats(res.totals || {});
-      setRows(res.byDay || []);
+      const params = {};
+      if (filters.from) params.startDate = filters.from;
+      if (filters.to) params.endDate = filters.to;
+
+      const [salesRes, openCreditsRes, clearedCreditsRes] = await Promise.all([
+        fetchSales({ ...params, limit: 1000 }),
+        getCreditSummary({ tab: "open" }),
+        getCreditSummary({ tab: "cleared" }),
+      ]);
+
+      const salesList = Array.isArray(salesRes) ? salesRes : [];
+      const openCredits = Array.isArray(openCreditsRes?.data)
+        ? openCreditsRes.data
+        : [];
+      const clearedCredits = Array.isArray(clearedCreditsRes?.data)
+        ? clearedCreditsRes.data
+        : [];
+
+      const salesById = new Map(
+        salesList.map((sale) => [sale.id, sale])
+      );
+
+      const salesTotal = salesList.reduce(
+        (sum, sale) => sum + (sale.total_amount || 0),
+        0
+      );
+
+      const openTotal = openCredits.reduce(
+        (sum, credit) => sum + (credit.amount || 0),
+        0
+      );
+
+      const clearedTotal = clearedCredits.reduce(
+        (sum, credit) => sum + (credit.amount || 0),
+        0
+      );
+
+      const dailyMap = new Map();
+
+      const ensureEntry = (key) => {
+        if (!dailyMap.has(key)) {
+          dailyMap.set(key, {
+            id: key,
+            date: key,
+            sales: 0,
+            creditOpen: 0,
+            creditCleared: 0,
+          });
+        }
+        return dailyMap.get(key);
+      };
+
+      salesList.forEach((sale) => {
+        const key = normalizeDateKey(sale.date);
+        if (!key) return;
+        const entry = ensureEntry(key);
+        entry.sales += sale.total_amount || 0;
+        if (sale.is_credit) {
+          entry.creditOpen += sale.total_amount || 0;
+        }
+      });
+
+      clearedCredits.forEach((credit) => {
+        const sale = salesById.get(credit.sale_id);
+        const key = normalizeDateKey(sale?.date || credit.date);
+        if (!key) return;
+        const entry = ensureEntry(key);
+        entry.creditCleared += credit.amount || 0;
+      });
+
+      setStats({
+        sales: salesTotal,
+        creditOpen: openTotal,
+        creditCleared: clearedTotal,
+      });
+
+      const sortedRows = Array.from(dailyMap.values()).sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      setRows(sortedRows);
     } catch (err) {
       console.error("Error loading reports:", err);
       toast.error("Failed to load reports.");
@@ -56,21 +151,21 @@ export default function ManagerReportsPage() {
           <KPI
             icon={FiDollarSign}
             label="Total Sales (KES)"
-            value={stats.sales?.toLocaleString() || 0}
+            value={formatCurrency(stats.sales)}
           />
         </Card>
         <Card>
           <KPI
             icon={FiCreditCard}
             label="Open Credit (KES)"
-            value={stats.creditOpen?.toLocaleString() || 0}
+            value={formatCurrency(stats.creditOpen)}
           />
         </Card>
         <Card>
           <KPI
             icon={FiCreditCard}
             label="Cleared Credit (KES)"
-            value={stats.creditCleared?.toLocaleString() || 0}
+            value={formatCurrency(stats.creditCleared)}
           />
         </Card>
       </div>
@@ -111,9 +206,24 @@ export default function ManagerReportsPage() {
         <DataTable
           columns={[
             { key: "date", label: "Date", sortable: true },
-            { key: "sales", label: "Sales (KES)", sortable: true },
-            { key: "creditOpen", label: "Open Credit", sortable: true },
-            { key: "creditCleared", label: "Cleared Credit", sortable: true },
+            {
+              key: "sales",
+              label: "Sales (KES)",
+              sortable: true,
+              render: (row) => formatCurrency(row.sales),
+            },
+            {
+              key: "creditOpen",
+              label: "Open Credit",
+              sortable: true,
+              render: (row) => formatCurrency(row.creditOpen),
+            },
+            {
+              key: "creditCleared",
+              label: "Cleared Credit",
+              sortable: true,
+              render: (row) => formatCurrency(row.creditCleared),
+            },
           ]}
           data={rows}
           loading={loading}

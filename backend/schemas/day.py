@@ -31,3 +31,11 @@ class DayOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DayStatusOut(BaseModel):
+    id: Optional[int] = None
+    date: Optional[dt_date] = None
+    is_open: bool
+    opened_by_id: Optional[int] = None
+    closed_by_id: Optional[int] = None

@@ -14,14 +14,30 @@ router = APIRouter(prefix="/sales", tags=["Sales"])
 def read_sales(
     skip: int = 0,
     limit: int = 100,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    employee_id: int | None = None,
     db: Session = Depends(get_db),
     current_user=Depends(require_role(["employer", "manager"]))
 ):
     """
-    ✅ View all sales.
+    ✅ View all sales with optional filters.
     Roles: Employer, Manager only.
     """
-    return crud_sale.get_sales(db, skip=skip, limit=limit)
+    if start_date and end_date and end_date < start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="end_date cannot be earlier than start_date",
+        )
+
+    return crud_sale.get_sales(
+        db,
+        skip=skip,
+        limit=limit,
+        start_date=start_date,
+        end_date=end_date,
+        employee_id=employee_id,
+    )
 
 
 @router.get("/my", response_model=list[SaleOut])

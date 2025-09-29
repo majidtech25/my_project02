@@ -212,6 +212,25 @@ export async function createSale(order) {
   });
 }
 
+export async function fetchSales({
+  skip = 0,
+  limit = 100,
+  startDate,
+  endDate,
+  employeeId,
+} = {}) {
+  const params = new URLSearchParams();
+  params.append("skip", String(skip));
+  params.append("limit", String(limit));
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
+  if (employeeId) params.append("employee_id", String(employeeId));
+
+  const query = params.toString();
+  const res = await apiFetch(`/sales${query ? `?${query}` : ""}`);
+  return Array.isArray(res) ? res : [];
+}
+
 export async function getMySales({ startDate, endDate } = {}) {
   const params = new URLSearchParams();
   if (startDate) params.append("start_date", startDate);
@@ -234,6 +253,8 @@ export async function getCreditSummary({ tab = "open" } = {}) {
     )
     .map((credit) => ({
       id: credit.id,
+      employee_id: credit.employee_id,
+      sale_id: credit.sale_id,
       customer: `Sale #${credit.sale_id}`,
       amount: credit.amount,
       date: credit.created_at,
@@ -286,33 +307,23 @@ export async function getSalesOverview() {
 
 /* ================== DAY CONTROL ================== */
 export async function getDayStatus() {
-  const res = await apiFetch("/days?skip=0&limit=30");
-  if (!Array.isArray(res) || res.length === 0) {
-    return null;
-  }
-
-  const sorted = [...res].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
-  const openDay = sorted.find((day) => day.is_open);
-
-  if (openDay) {
+  const res = await apiFetch("/days/current/status");
+  if (!res) {
     return {
-      id: openDay.id,
-      isOpen: true,
-      date: openDay.date,
-      openedById: openDay.opened_by_id,
-      closedById: openDay.closed_by_id,
+      id: null,
+      isOpen: false,
+      date: null,
+      openedById: null,
+      closedById: null,
     };
   }
 
-  const latest = sorted[0];
   return {
-    id: latest?.id ?? null,
-    isOpen: false,
-    date: latest?.date ?? null,
-    openedById: latest?.opened_by_id ?? null,
-    closedById: latest?.closed_by_id ?? null,
+    id: res.id ?? null,
+    isOpen: Boolean(res.is_open),
+    date: res.date ?? null,
+    openedById: res.opened_by_id ?? null,
+    closedById: res.closed_by_id ?? null,
   };
 }
 

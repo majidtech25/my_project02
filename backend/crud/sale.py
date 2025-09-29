@@ -1,4 +1,5 @@
 # backend/crud/sale.py
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 import models
@@ -53,9 +54,25 @@ def calculate_total_and_items(db: Session, items):
 
 
 # ========= CRUD =========
-def get_sales(db: Session, skip: int = 0, limit: int = 100):
-    """Retrieve all sales."""
-    return db.query(models.Sale).offset(skip).limit(limit).all()
+def get_sales(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    employee_id: int | None = None,
+):
+    """Retrieve sales with optional filtering."""
+    query = db.query(models.Sale)
+
+    if start_date:
+        query = query.filter(func.date(models.Sale.date) >= start_date)
+    if end_date:
+        query = query.filter(func.date(models.Sale.date) <= end_date)
+    if employee_id:
+        query = query.filter(models.Sale.employee_id == employee_id)
+
+    return query.order_by(models.Sale.date.desc(), models.Sale.id.desc()).offset(skip).limit(limit).all()
 
 
 def get_sale(db: Session, sale_id: int):

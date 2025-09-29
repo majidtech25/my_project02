@@ -26,7 +26,8 @@ export default function NewSalePage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [submitting, setSubmitting] = useState(false);
   const [recentSale, setRecentSale] = useState(null);
-  const [dayOpen, setDayOpen] = useState(true);
+  const [dayOpen, setDayOpen] = useState(false);
+  const [dayInfo, setDayInfo] = useState(null);
   const [checkingDay, setCheckingDay] = useState(true);
 
   // ✅ Fetch categories
@@ -77,10 +78,12 @@ export default function NewSalePage() {
     try {
       const status = await getDayStatus();
       setDayOpen(Boolean(status?.isOpen));
+      setDayInfo(status);
     } catch (err) {
       console.error("Failed to load day status", err);
-      toast.error("Unable to verify if the sales day is open.");
+        toast.error("Unable to verify if the sales day is open.");
       setDayOpen(false);
+      setDayInfo(null);
     } finally {
       setCheckingDay(false);
     }
@@ -203,6 +206,16 @@ export default function NewSalePage() {
         timestamp: result?.date ?? new Date().toISOString(),
       });
 
+      try {
+        window.localStorage.setItem(
+          "ims:sale:created",
+          String(Date.now())
+        );
+        window.dispatchEvent(new CustomEvent("ims:sale:created"));
+      } catch (err) {
+        console.warn("Failed to broadcast sale creation", err);
+      }
+
       setCart([]);
       await loadProducts();
       setSaleType("paid");
@@ -302,6 +315,19 @@ export default function NewSalePage() {
       <div className="lg:col-span-1">
         <Card className="p-4">
           <h2 className="text-lg font-semibold mb-4">Cart</h2>
+          <div className="mb-3 text-sm">
+            {checkingDay ? (
+              <span className="text-gray-500">Checking day status…</span>
+            ) : dayOpen ? (
+              <span className="text-green-600">
+                Day open{dayInfo?.date ? ` (${dayInfo.date})` : ""}. You're good to go.
+              </span>
+            ) : (
+              <span className="text-red-600">
+                Day is closed. Ask a manager to open today before recording sales.
+              </span>
+            )}
+          </div>
           {cart.length === 0 ? (
             <p className="text-gray-500">No items in cart</p>
           ) : (
